@@ -1,20 +1,28 @@
 use protocol::{CancelRequest, CompletionRequest, JsonRpcMessage, MemoryRecordRequest};
-use tracing::warn;
+use tracing::{debug, info, warn};
 
 pub async fn dispatch(raw: &str) -> Option<String> {
+    debug!("RECV(daemon) >>> {}", raw);
+
     let msg: JsonRpcMessage = match serde_json::from_str(raw) {
         Ok(m) => m,
         Err(e) => {
             warn!("Failed to parse JSON-RPC message: {}", e);
+            info!("RECV_PARSE_FAIL(daemon) <<< {}", raw);
             return None;
         }
     };
 
-    match msg {
+    let resp = match msg {
         JsonRpcMessage::Request(req) => handle_completion(req).await,
         JsonRpcMessage::Cancel(req) => handle_cancel(req).await,
         JsonRpcMessage::Record(req) => handle_record(req).await,
+    };
+
+    if let Some(r) = &resp {
+        debug!("SEND(daemon) <<< {}", r);
     }
+    resp
 }
 
 async fn handle_completion(req: CompletionRequest) -> Option<String> {

@@ -7,6 +7,12 @@
 SSC_SOCKET="${SSC_SOCKET:-/tmp/smart-shell-copilot.sock}"
 SSC_DEADLINE_MS="${SSC_DEADLINE_MS:-2000}"
 
+# ---- 调试日志 ----
+# SSC_DEBUG=1 时,把 hook 发出的每个请求和收到的每个响应都追加到
+# $SSC_HOOK_LOG(默认 ~/.smart-shell-copilot/hook.log),方便排查问题。
+SSC_DEBUG="${SSC_DEBUG:-0}"
+SSC_HOOK_LOG="${SSC_HOOK_LOG:-$HOME/.smart-shell-copilot/hook.log}"
+
 typeset -g _ssc_session_id="ssc-$$"
 typeset -g _ssc_request_counter=0
 typeset -g _ssc_active_request_id=""
@@ -14,6 +20,15 @@ typeset -g _ssc_suggestion=""
 typeset -g _ssc_last_key_ms=0
 typeset -g _ssc_connected=0
 typeset -gHi _ssc_fd=-1
+
+# 追加一行到 hook 日志(仅 SSC_DEBUG=1 时)。
+_ssc_log() {
+    (( SSC_DEBUG )) || return
+    local dir
+    dir="$(dirname "$SSC_HOOK_LOG" 2>/dev/null)"
+    [[ -n "$dir" ]] && mkdir -p "$dir" 2>/dev/null
+    printf '%s\t%s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$1" >> "$SSC_HOOK_LOG" 2>/dev/null
+}
 
 _ssc_probe() {
     [[ -S "$SSC_SOCKET" ]] || return 1
@@ -65,6 +80,7 @@ _ssc_request() {
     payload="{\"jsonrpc\":\"2.0\",\"id\":\"${req_id}\",\"method\":\"completion.request\",\"params\":{\"session_id\":\"${_ssc_session_id}\",\"shell_kind\":\"zsh\",\"line\":\"${line}\",\"cursor\":${cursor},\"cwd\":\"${cwd}\",\"deadline_ms\":${SSC_DEADLINE_MS},\"client_sent_at_ms\":${now}}}"
 
     # Write the request to the persistent socket fd.
+    _ssc_log "REQ(hook) >>> ${payload}"
     print -u "$_ssc_fd" -r -- "$payload"
 }
 
@@ -76,6 +92,8 @@ _ssc_handle_response() {
     IFS= read -u "$_ssc_fd" -r response 2>/dev/null
     [[ -n "$response" ]] || return
 
+    _ssc_log "RESP(hook) <<< ${response}"
+
     # Only accept a suggestion for the latest request.
     [[ "$response" == *'"kind":"suggestion"'* ]] || return
     [[ "$response" == *"\"id\":\"${expected_id}\""* ]] || return
@@ -86,6 +104,7 @@ _ssc_handle_response() {
     [[ "$suffix" == *$'\n'* || "$suffix" == *$'\r'* ]] && return
 
     _ssc_suggestion="$suffix"
+    _ssc_log "RENDER(hook) suffix=${suffix}"
     _ssc_render_suggestion
 }
 
