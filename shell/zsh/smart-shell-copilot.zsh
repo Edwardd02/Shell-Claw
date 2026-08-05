@@ -93,14 +93,14 @@ _ssc_render_suggestion() {
     local n=${#_ssc_suggestion}
     if (( n > 0 )) && [[ -n "$_ssc_suggestion" ]]; then
         region_highlight+=("$CURSOR $(( CURSOR + n )) fg=8")
-        zle -R "${BUFFER}${_ssc_suggestion}"
+        zle -R -- "${BUFFER}${_ssc_suggestion}"
     fi
 }
 
 _ssc_clear_suggestion() {
     if [[ -n "$_ssc_suggestion" ]]; then
         _ssc_suggestion=""
-        zle -R "$BUFFER" 2>/dev/null || true
+        zle -R -- "$BUFFER" 2>/dev/null || true
     fi
 }
 
