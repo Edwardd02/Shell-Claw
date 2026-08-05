@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.smart-shell-copilot.daemon</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/smart-shell-copilot-daemon</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>SSC_SOCKET_PATH</key>
+        <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot/daemon.sock</string>
+        <key>SSC_MODEL_PATH</key>
+        <string>/opt/homebrew/share/smart-shell-copilot/models/qwen3-0.6b-base.gguf</string>
+        <key>SSC_DATA_DIR</key>
+        <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot/daemon.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot/daemon.error.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/PLACEHOLDER_USER</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>

@@ -1,0 +1,26 @@
+target/
+*.gguf
+*.sock
+*.db
+*.db-journal
+*.db-wal
+*.log
+*.profdata
+*.profraw
+.env
+.env.*
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+.idea/
+
+# Model files & HuggingFace cache (large, regenerable)
+models/*.gguf
+models/models--*/
+models/.cache/
+models/.locks/
+models/CACHEDIR.TAG
+
+# Local daemon runtime
+.smart-shell-copilot/
