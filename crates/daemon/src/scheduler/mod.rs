@@ -1,4 +1,4 @@
-use protocol::{CompletionRequest, CompletionResult, SuggestionSource};
+use protocol::{CompletionRequest, CompletionResult};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::memory::db::Database;
@@ -77,16 +77,22 @@ impl Scheduler {
         let deadline_ms = req.params.deadline_ms;
 
         let memory = self.memory.lock().unwrap().clone();
-        let candidates = if let Some(memory) = memory {
-            let query = RetrievalQuery {
-                cwd: req.params.cwd.clone(),
-                line_prefix: req.params.line.clone(),
-                limit: 5,
-                deadline_ms,
-            };
-            match memory.retrieve(query) {
-                Ok(c) => c,
-                Err(_) => vec![],
+        // 若配置关闭了记忆,跳过检索(仅使用模型推理)。
+        let memory_enabled = crate::config::DaemonConfig::load().memory_enabled;
+        let candidates = if memory_enabled {
+            if let Some(memory) = memory {
+                let query = RetrievalQuery {
+                    cwd: req.params.cwd.clone(),
+                    line_prefix: req.params.line.clone(),
+                    limit: 5,
+                    deadline_ms,
+                };
+                match memory.retrieve(query) {
+                    Ok(c) => c,
+                    Err(_) => vec![],
+                }
+            } else {
+                vec![]
             }
         } else {
             vec![]
@@ -128,7 +134,7 @@ impl Scheduler {
                                 output.suffix,
                                 req.params.cursor,
                                 format!("{:x}", hasher.finish()),
-                                SuggestionSource::Model,
+                                output.source,
                                 output.ttft_ms,
                             ),
                         };
@@ -146,6 +152,11 @@ impl Scheduler {
 
     pub async fn record_command(&self, cwd: &str, command: &str) {
         self.init_pipeline();
+
+        // 记忆未启用时不记录。
+        if !crate::config::DaemonConfig::load().memory_enabled {
+            return;
+        }
 
         let memory = self.memory.lock().unwrap().clone();
         if let Some(memory) = memory {

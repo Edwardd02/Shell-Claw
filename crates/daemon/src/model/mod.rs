@@ -44,6 +44,8 @@ pub struct ModelOutput {
     pub suffix: String,
     pub ttft_ms: u64,
     pub model_id: String,
+    /// 建议真实来源:记忆快路径标 `Memory`;模型推理标 `Model`。
+    pub source: protocol::SuggestionSource,
 }
 
 pub trait CompletionModel: Send + Sync {

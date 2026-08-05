@@ -24,3 +24,7 @@ models/CACHEDIR.TAG
 
 # Local daemon runtime
 .smart-shell-copilot/
+
+# Downloaded reference repo (vllm) & runtime logs
+/vllm/
+/logs/

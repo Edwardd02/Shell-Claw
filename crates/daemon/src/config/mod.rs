@@ -9,6 +9,8 @@ pub struct DaemonConfig {
     pub max_line_length: usize,
     pub default_deadline_ms: u64,
     pub ranking_weights: RankingWeights,
+    /// 是否启用本地命令记忆。设 SSС_DISABLE_MEMORY=1 关闭,请求将只走模型推理。
+    pub memory_enabled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +42,7 @@ impl Default for DaemonConfig {
             max_line_length: 4096,
             default_deadline_ms: 25,
             ranking_weights: RankingWeights::default(),
+            memory_enabled: true,
         }
     }
 }
@@ -70,7 +73,13 @@ impl DaemonConfig {
             .unwrap_or_else(|_| home.join(".smart-shell-copilot"));
 
         let db_path = base.join("memory.db");
-        let log_path = base.join("daemon.log");
+
+        // 日志目录:SSC_LOG_DIR 优先;否则默认项目根下 logs/(相对当前工作目录)。
+        // 典型:从项目根 `./target/release/daemon` 启动 → ./logs/daemon.log
+        let log_dir = std::env::var("SSC_LOG_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("logs"));
+        let log_path = log_dir.join("daemon.log");
 
         Self {
             socket_path,
@@ -86,6 +95,11 @@ impl DaemonConfig {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(25),
             ranking_weights: RankingWeights::default(),
+            memory_enabled: !matches!(
+                std::env::var("SSC_DISABLE_MEMORY")
+                    .as_deref(),
+                Ok("1") | Ok("true") | Ok("TRUE")
+            ),
         }
     }
 }

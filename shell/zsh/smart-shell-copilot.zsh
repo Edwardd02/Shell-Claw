@@ -9,13 +9,30 @@ SSC_DEADLINE_MS="${SSC_DEADLINE_MS:-2000}"
 
 # ---- 调试日志 ----
 # SSC_DEBUG=1 时,把 hook 发出的每个请求和收到的每个响应都追加到
-# $SSC_HOOK_LOG(默认 ~/.smart-shell-copilot/hook.log),方便排查问题。
+# $SSC_HOOK_LOG(默认 $PROJECT_ROOT/logs/hook.log),方便排查问题。
 SSC_DEBUG="${SSC_DEBUG:-0}"
-SSC_HOOK_LOG="${SSC_HOOK_LOG:-$HOME/.smart-shell-copilot/hook.log}"
+if [[ -z "$SSC_HOOK_LOG" ]]; then
+    # 由 hook 脚本路径推导项目根目录(…/shell/zsh/xxx.zsh 向上两级)
+    case "$0" in
+        /*/*) _ssc_hook_root="${0%/shell/zsh/*}"; SSC_HOOK_LOG="$_ssc_hook_root/logs/hook.log" ;;
+        *)    SSC_HOOK_LOG="$HOME/smart-shell-copilot-hook.log" ;;
+    esac
+fi
+
+# ---- 交互日志(始终记录,不依赖 SSC_DEBUG)----
+# 人类可读:一行 时间戳 + INPUT(用户命令行输入),一行 时间戳 + OUTPUT(模型建议)。
+# 写到 $SSC_INTERACTION_LOG(默认项目根 logs/interaction.log)。
+if [[ -z "$SSC_INTERACTION_LOG" ]]; then
+    case "$0" in
+        /*/*) _ssc_hook_root2="${0%/shell/zsh/*}"; SSC_INTERACTION_LOG="$_ssc_hook_root2/logs/interaction.log" ;;
+        *)    SSC_INTERACTION_LOG="$HOME/smart-shell-copilot-interaction.log" ;;
+    esac
+fi
 
 typeset -g _ssc_session_id="ssc-$$"
 typeset -g _ssc_request_counter=0
 typeset -g _ssc_active_request_id=""
+typeset -g _ssc_req_line=""          # 最近一次请求对应的命令行(过期判断)
 typeset -g _ssc_suggestion=""
 typeset -g _ssc_last_key_ms=0
 typeset -g _ssc_connected=0
@@ -28,6 +45,16 @@ _ssc_log() {
     dir="$(dirname "$SSC_HOOK_LOG" 2>/dev/null)"
     [[ -n "$dir" ]] && mkdir -p "$dir" 2>/dev/null
     printf '%s\t%s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$1" >> "$SSC_HOOK_LOG" 2>/dev/null
+}
+
+# 追加一行到交互日志(始终记录)。type 为 "INPUT" 或 "OUTPUT"。
+_ssc_log_interaction() {
+    local type="$1"
+    local text="$2"
+    local dir
+    dir="$(dirname "$SSC_INTERACTION_LOG" 2>/dev/null)"
+    [[ -n "$dir" ]] && mkdir -p "$dir" 2>/dev/null
+    printf '%s  %-6s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$type" "$text" >> "$SSC_INTERACTION_LOG" 2>/dev/null
 }
 
 _ssc_probe() {
@@ -69,6 +96,7 @@ _ssc_request() {
     _ssc_request_counter=$(( _ssc_request_counter + 1 ))
     local req_id="${_ssc_session_id}:${_ssc_request_counter}"
     _ssc_active_request_id="$req_id"
+    _ssc_req_line="${BUFFER:-}"      # 记录本次请求对应的命令行,过期判断用
 
     local line="${BUFFER:-}"
     local cursor="${CURSOR:-0}"
@@ -81,6 +109,7 @@ _ssc_request() {
 
     # Write the request to the persistent socket fd.
     _ssc_log "REQ(hook) >>> ${payload}"
+    _ssc_log_interaction "INPUT" "$line"
     print -u "$_ssc_fd" -r -- "$payload"
 }
 
@@ -94,17 +123,31 @@ _ssc_handle_response() {
 
     _ssc_log "RESP(hook) <<< ${response}"
 
-    # Only accept a suggestion for the latest request.
-    [[ "$response" == *'"kind":"suggestion"'* ]] || return
+    # 只处理最新请求的响应(id 不匹配 = 过期,丢弃)。
     [[ "$response" == *"\"id\":\"${expected_id}\""* ]] || return
+
+    # 过期判断:若用户已把命令行修改得和请求时不一致,这条响应作废。
+    # 此时必须清空旧建议,否则旧建议会叠在新输入后面(如 git checko→ut,
+    # 继续输入 u 后残留 ut 造成 git checkoutu)。
+    if [[ "$BUFFER" != "$_ssc_req_line" ]]; then
+        _ssc_clear_suggestion
+        return
+    fi
+
+    # "none" 也当作一次确定的覆盖:清空当前建议(而非保留旧的)。
+    if [[ "$response" != *'"kind":"suggestion"'* ]]; then
+        _ssc_clear_suggestion
+        return
+    fi
 
     local suffix
     suffix="$(printf '%s' "$response" | grep -o '"suffix":"[^"]*"' | sed 's/"suffix":"//;s/"$//')"
-    [[ -z "$suffix" ]] && return
-    [[ "$suffix" == *$'\n'* || "$suffix" == *$'\r'* ]] && return
+    [[ -z "$suffix" ]] && { _ssc_clear_suggestion; return; }
+    [[ "$suffix" == *$'\n'* || "$suffix" == *$'\r'* ]] && { _ssc_clear_suggestion; return; }
 
     _ssc_suggestion="$suffix"
     _ssc_log "RENDER(hook) suffix=${suffix}"
+    _ssc_log_interaction "OUTPUT" "$suffix"
     _ssc_render_suggestion
 }
 
