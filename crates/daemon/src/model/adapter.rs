@@ -183,29 +183,27 @@ fn build_instruct_prompt(
 ) -> Option<String> {
     let tmpl = model.chat_template(None).ok()?;
 
+    // 用 "predict" 这类强指令词。目标:让模型像补全器,输出光标后的纯后缀。
+    // 注意:不要在 system 里放模拟 user/assistant 的 few-shot,那会和 chat
+    // template 的 message 包装冲突,让 0.5B 模型困惑。
     let system = LlamaChatMessage::new(
         "system".to_string(),
-        "You are a shell command auto-completion engine. The user has typed a \
-         PARTIAL command line. Your job: output ONLY the text that should be \
-         APPENDED after what they typed, to make a complete shell command. \
-         Rules: \
-         - Never repeat the already-typed prefix. \
-         - Output only the plain suffix text. No quotes, no backticks, no \
-           explanation, no markdown. Output raw command text only. \
-         - If the prefix is already a complete command, output nothing. \
-         - Example: prefix git che -> output ckout main \
-         - Example: prefix pip insta -> output ll requests \
-         - Example: prefix cd Des -> output ktop"
+        "You are a shell command autocomplete engine. The user typed a shell \
+         command prefix, and the cursor is at its end. Predict ONLY the text \
+         that comes after the cursor to complete the command.\n\
+         Output the plain predicted suffix only. No explanation, no quotes, \
+         no backticks, no code fences. Output nothing if the command is \
+         already complete.\n\
+         Reasoning style: \"git check\" continues as \" okout main\"; \
+         \"pip instal\" continues as \"l requests\"; \
+         \"cd /hom\" continues as \"e/user\"."
             .to_string(),
     )
     .ok()?;
 
     let user = LlamaChatMessage::new(
         "user".to_string(),
-        format!(
-            "The user has typed: {} Output only the suffix to append.",
-            prefix
-        ),
+        prefix.to_string(),
     )
     .ok()?;
 

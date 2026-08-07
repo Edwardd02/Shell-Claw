@@ -124,15 +124,10 @@ _ssc_handle_response() {
     _ssc_log "RESP(hook) <<< ${response}"
 
     # 只处理最新请求的响应(id 不匹配 = 过期,丢弃)。
+    # 注意:不要在 zle -F 异步回调里读 BUFFER 判断过期 —— 该回调里 BLUEFFER
+    # 不一定是当前编辑行(经常为空),会导致建议被误判过期而清空、闪烁。
+    # 过期判定完全交给 _ssc_active_request_id(id 唯一) + self-insert 时清空。
     [[ "$response" == *"\"id\":\"${expected_id}\""* ]] || return
-
-    # 过期判断:若用户已把命令行修改得和请求时不一致,这条响应作废。
-    # 此时必须清空旧建议,否则旧建议会叠在新输入后面(如 git checko→ut,
-    # 继续输入 u 后残留 ut 造成 git checkoutu)。
-    if [[ "$BUFFER" != "$_ssc_req_line" ]]; then
-        _ssc_clear_suggestion
-        return
-    fi
 
     # "none" 也当作一次确定的覆盖:清空当前建议(而非保留旧的)。
     if [[ "$response" != *'"kind":"suggestion"'* ]]; then
@@ -154,8 +149,11 @@ _ssc_handle_response() {
 _ssc_render_suggestion() {
     local n=${#_ssc_suggestion}
     if (( n > 0 )) && [[ -n "$_ssc_suggestion" ]]; then
-        region_highlight+=("$CURSOR $(( CURSOR + n )) fg=8")
-        zle -R -- "${BUFFER}${_ssc_suggestion}"
+        # 渲染用"请求时的行"(_ssc_req_line),而非 zle -F 异步回调里的 $BUFFER
+        # (后者在异步上下文常为空/不正确,是闪烁和无输出的大根因)。
+        local base="${_ssc_req_line}"
+        region_highlight+=("${#base} $(( ${#base} + n )) fg=8")
+        zle -R -- "${base}${_ssc_suggestion}"
     fi
 }
 

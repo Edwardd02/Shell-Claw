@@ -28,3 +28,9 @@ models/CACHEDIR.TAG
 # Downloaded reference repo (vllm) & runtime logs
 /vllm/
 /logs/
+
+# Training: 原始 tldr 数据源(可重新 git clone) + 微调大权重(可再生)
+/tldr/
+/train/lora-*/
+/train/*/checkpoint-*
+
