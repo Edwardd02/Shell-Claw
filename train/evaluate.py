@@ -13,19 +13,28 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
-BASE = "Qwen/Qwen3-0.6B-Base"
+BASE = "models/qwen3-0.6b-base"
 
 
-def load_model(adapter_path: str):
-    print(f"加载基础模型 {BASE} ...")
-    tok = AutoTokenizer.from_pretrained(BASE)
+def get_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+
+DEVICE = get_device()
+
+
+def load_model(base: str, adapter_path: str):
+    print(f"加载基础模型 {base} ...")
+    tok = AutoTokenizer.from_pretrained(base)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    base = AutoModelForCausalLM.from_pretrained(
-        BASE, dtype=torch.float16
-    ).to("mps")
+    model_base = AutoModelForCausalLM.from_pretrained(
+        base, dtype=torch.float16
+    ).to(DEVICE)
     print(f"加载 LoRA adapter: {adapter_path} ...")
-    model = PeftModel.from_pretrained(base, adapter_path)
+    model = PeftModel.from_pretrained(model_base, adapter_path)
     model.eval()
     return model, tok
 
@@ -33,7 +42,7 @@ def load_model(adapter_path: str):
 def complete(model, tok, prefix: str, max_new=40):
     msgs = [{"role": "user", "content": prefix}]
     txt = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
-    ids = tok(txt, return_tensors="pt", truncation=True, max_length=512).input_ids.to("mps")
+    ids = tok(txt, return_tensors="pt", truncation=True, max_length=512).input_ids.to(DEVICE)
     with torch.no_grad():
         out = model.generate(input_ids=ids, max_new_tokens=max_new, do_sample=False)
     return tok.decode(out[0][len(ids[0]):], skip_special_tokens=True).strip()
@@ -42,9 +51,10 @@ def complete(model, tok, prefix: str, max_new=40):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--adapter", required=True, help="LoRA 输出目录")
+    parser.add_argument("--base", default=BASE, help="基础模型路径(本地目录)")
     args = parser.parse_args()
 
-    model, tok = load_model(args.adapter)
+    model, tok = load_model(args.base, args.adapter)
 
     # 记忆里有的命令(应能正确补出)
     tests_memory = [

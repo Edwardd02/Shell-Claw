@@ -18,6 +18,7 @@ Thumbs.db
 # Model files & HuggingFace cache (large, regenerable)
 models/*.gguf
 models/models--*/
+models/*/
 models/.cache/
 models/.locks/
 models/CACHEDIR.TAG
@@ -33,4 +34,8 @@ models/CACHEDIR.TAG
 /tldr/
 /train/lora-*/
 /train/*/checkpoint-*
+
+# Python 缓存
+__pycache__/
+*.pyc
 
