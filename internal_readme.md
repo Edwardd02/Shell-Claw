@@ -219,7 +219,7 @@ cargo build --release
 ### 3. 手动启动守护进程
 ```bash
 SSC_SOCKET_PATH=/tmp/smart-shell-copilot.sock \
-SSC_MODEL_PATH=models/qwen3-0.6b-base.gguf \
+SSC_MODEL_PATH=models/qwen2.5-coder-0.5b-instruct-finetuned.gguf \
 SSC_DATA_DIR=~/.smart-shell-copilot \
 cargo run --release -p daemon
 ```

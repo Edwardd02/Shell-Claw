@@ -9,7 +9,7 @@ Restart=always
 RestartSec=5
 
 Environment=SSC_SOCKET_PATH=%h/.smart-shell-copilot/daemon.sock
-Environment=SSC_MODEL_PATH=/opt/homebrew/share/smart-shell-copilot/models/qwen3-0.6b-base.gguf
+Environment=SSC_MODEL_PATH=/opt/homebrew/share/smart-shell-copilot/models/qwen2.5-coder-0.5b-instruct-finetuned.gguf
 Environment=SSC_DATA_DIR=%h/.smart-shell-copilot
 
 StandardOutput=append:%h/.smart-shell-copilot/daemon.log

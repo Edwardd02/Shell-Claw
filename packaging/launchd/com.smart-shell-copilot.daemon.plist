@@ -15,7 +15,7 @@
         <key>SSC_SOCKET_PATH</key>
         <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot/daemon.sock</string>
         <key>SSC_MODEL_PATH</key>
-        <string>/opt/homebrew/share/smart-shell-copilot/models/qwen3-0.6b-base.gguf</string>
+        <string>/opt/homebrew/share/smart-shell-copilot/models/qwen2.5-coder-0.5b-instruct-finetuned.gguf</string>
         <key>SSC_DATA_DIR</key>
         <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot</string>
     </dict>

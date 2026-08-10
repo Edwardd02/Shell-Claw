@@ -13,7 +13,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
-BASE = "models/qwen3-0.6b-base"
+BASE = "models/qwen2.5-coder-0.5b-instruct"
 
 
 def get_device():

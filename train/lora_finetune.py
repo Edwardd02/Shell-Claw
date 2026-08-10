@@ -15,7 +15,7 @@
 
 用法:
     python3 train/lora_finetune.py --data train/commands.jsonl \
-        --model models/qwen3-0.6b-base --output train/lora-checkpoint \
+        --model models/qwen2.5-coder-0.5b-instruct --output train/lora-checkpoint \
         --device cuda
 """
 
@@ -156,7 +156,7 @@ def tokenize_sample(tokenizer, prefix: str, suffix: str, max_length: int):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="train/commands.jsonl")
-    parser.add_argument("--model", default="models/qwen3-0.6b-base")
+    parser.add_argument("--model", default="models/qwen2.5-coder-0.5b-instruct")
     parser.add_argument("--output", default="train/lora-out")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--lr", type=float, default=3e-4)

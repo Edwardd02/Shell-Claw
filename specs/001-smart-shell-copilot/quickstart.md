@@ -63,7 +63,7 @@ current-directory, frequent, and recent commands above unrelated matches.
 ## 5. Model Warmed TTFT and Resource Benchmark
 
 ```bash
-./tests/benchmarks/model-ttft.sh --model models/qwen3-0.6b-base.gguf
+./tests/benchmarks/model-ttft.sh --model models/qwen2.5-coder-0.5b-instruct-finetuned.gguf
 ./tests/benchmarks/daemon-resources.sh
 ```
 

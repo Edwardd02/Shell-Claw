@@ -26,7 +26,7 @@ class SmartShellCopilot < Formula
       error_log_path var/"log/smart-shell-copilot.error.log"
       environment_variables(
         SSC_SOCKET_PATH: "#{Dir.home}/.smart-shell-copilot/daemon.sock",
-        SSC_MODEL_PATH: "#{opt_prefix}/share/smart-shell-copilot/models/qwen3-0.6b-base.gguf",
+        SSC_MODEL_PATH: "#{opt_prefix}/share/smart-shell-copilot/models/qwen2.5-coder-0.5b-instruct-finetuned.gguf",
         SSC_DATA_DIR: "#{Dir.home}/.smart-shell-copilot"
       )
       working_dir Dir.home

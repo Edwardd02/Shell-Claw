@@ -36,7 +36,7 @@ impl Default for DaemonConfig {
     fn default() -> Self {
         Self {
             socket_path: PathBuf::from("/tmp/smart-shell-copilot.sock"),
-            model_path: PathBuf::from("models/qwen3-0.6b-base.gguf"),
+            model_path: PathBuf::from("models/qwen2.5-coder-0.5b-instruct-finetuned.gguf"),
             db_path: dirs_fallback(),
             log_path: dirs_fallback(),
             max_line_length: 4096,
@@ -65,7 +65,7 @@ impl DaemonConfig {
 
         let model_path = std::env::var("SSC_MODEL_PATH")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("models/qwen3-0.6b-base.gguf"));
+            .unwrap_or_else(|_| PathBuf::from("models/qwen2.5-coder-0.5b-instruct-finetuned.gguf"));
 
         let home = dirs_home();
         let base = std::env::var("SSC_DATA_DIR")
