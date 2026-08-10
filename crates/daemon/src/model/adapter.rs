@@ -176,27 +176,24 @@ fn llama_generate_suffix(
     llama_complete_from_tokens(engine, &prompt_tokens, context, cancel)
 }
 
-/// 用模型的 chat template 把(裸前缀)包装成一段补全指令的 prompt。
+/// 构造与训练完全一致的 prompt。
+/// 重要:训练脚本(lora_finetune.py 的 tokenize_sample)用的是
+///   user=prefix, assistant=完整命令, 且【没有 system 消息】。
+/// 推理时若加了 system / 指令,会偏离训练分布,导致微调模型发挥失常。
+/// 因此这里只放一个 user 消息(内容=前缀),让模型按训练学到的续出完整命令。
 fn build_instruct_prompt(
     model: &LlamaModel,
     prefix: &str,
 ) -> Option<String> {
     let tmpl = model.chat_template(None).ok()?;
 
-    // 用 "predict" 这类强指令词。目标:让模型像补全器,输出光标后的纯后缀。
-    // 注意:不要在 system 里放模拟 user/assistant 的 few-shot,那会和 chat
-    // template 的 message 包装冲突,让 0.5B 模型困惑。
+    // 训练/推理对齐:用训练时见过的 Qwen 默认 system prompt。
+    // 0.5B 小模型对没见过的 system 指令没有鲁棒性 —— 自创的 autocomplete
+    // 指令会让它退化(对照实验:默认 system -> "-Force"; 自创 system -> "..")。
+    // 这里必须和训练脚本 tokenize_sample 里的 system 完全一致。
     let system = LlamaChatMessage::new(
         "system".to_string(),
-        "You are a shell command autocomplete engine. The user typed a shell \
-         command prefix, and the cursor is at its end. Predict ONLY the text \
-         that comes after the cursor to complete the command.\n\
-         Output the plain predicted suffix only. No explanation, no quotes, \
-         no backticks, no code fences. Output nothing if the command is \
-         already complete.\n\
-         Reasoning style: \"git check\" continues as \" okout main\"; \
-         \"pip instal\" continues as \"l requests\"; \
-         \"cd /hom\" continues as \"e/user\"."
+        "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."
             .to_string(),
     )
     .ok()?;
@@ -207,6 +204,7 @@ fn build_instruct_prompt(
     )
     .ok()?;
 
+    // add_ass=true:在末尾补上 assistant 起始符,让模型从这里续写。
     let rendered = model
         .apply_chat_template(&tmpl, &[system, user], /*add_ass=*/ true)
         .ok()?;
