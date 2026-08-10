@@ -154,14 +154,33 @@ _ssc_handle_response() {
     _ssc_render_suggestion
 }
 
+# 拼接 base + suggestion,避免双空格:
+# 当 base 已以空格结尾(s"git ")且 suggestion 以空格开头(s" diff")
+# 时,去掉 suggestion 的一个前导空格,否则会拼出 "git  diff" 双空格。
+_ssc_join_suggestion() {
+    local base="$1"
+    local sugg="$2"
+    if [[ "$base" == *" " ]] && [[ "$sugg" == " "* ]]; then
+        sugg="${sugg# }"
+    fi
+    print -r -- "${base}${sugg}"
+}
+
 _ssc_render_suggestion() {
     local n=${#_ssc_suggestion}
     if (( n > 0 )) && [[ -n "$_ssc_suggestion" ]]; then
         # 渲染用"请求时的行"(_ssc_req_line),而非 zle -F 异步回调里的 $BUFFER
         # (后者在异步上下文常为空/不正确,是闪烁和无输出的大根因)。
         local base="${_ssc_req_line}"
-        region_highlight+=("${#base} $(( ${#base} + n )) fg=8")
-        zle -R -- "${base}${_ssc_suggestion}"
+        local merged
+        merged="$(_ssc_join_suggestion "$base" "$_ssc_suggestion")"
+        local n2=${#_ssc_suggestion}
+        # 去重一个空格后,高亮区间相应-1
+        if [[ "$base" == *" " ]] && [[ "$_ssc_suggestion" == " "* ]]; then
+            n2=$(( n2 - 1 ))
+        fi
+        region_highlight+=("${#base} $(( ${#base} + n2 )) fg=8")
+        zle -R -- "$merged"
     fi
 }
 
@@ -183,7 +202,7 @@ _ssc_self_insert() {
 
 _ssc_accept() {
     if [[ -n "$_ssc_suggestion" ]]; then
-        BUFFER="${BUFFER}${_ssc_suggestion}"
+        BUFFER="$(_ssc_join_suggestion "$BUFFER" "$_ssc_suggestion")"
         CURSOR=${#BUFFER}
         _ssc_clear_suggestion
         zle -R
