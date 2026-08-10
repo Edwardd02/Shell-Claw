@@ -1,7 +1,11 @@
 # Smart Shell Copilot — LoRA 微调训练计划
 
 > 日期：2026-08-10
-> 目标：微调 Qwen3-0.6B-Base，让它学会 Unix 命令补全，并接回 daemon 的 llama.cpp 推理。
+> 目标：微调 Qwen2.5-Coder-0.5B-Instruct，让它学会 Unix 命令补全，并接回 daemon 的 llama.cpp 推理。
+
+> **基座模型：Qwen2.5-Coder-0.5B-Instruct**（已实测成功）。
+> ❌ 不要用 Qwen3-0.6B-Base —— 实验证明它学不动
+>（loss 卡 3.0、中文/波兰语乱码、复现不了；见 `train_log_aug_9.md` 第四节）。
 
 ---
 
@@ -84,7 +88,7 @@ python3 train/extract.py --dirs common linux --output train/commands-linux.jsonl
 ```bash
 python3 train/lora_finetune.py \
     --data train/commands-macos.jsonl \
-    --model models/qwen3-0.6b-base \
+    --model models/qwen2.5-coder-0.5b-instruct \
     --output train/lora-macos \
     --epochs 3 \
     --batch-size 48 \
@@ -105,7 +109,7 @@ python3 train/lora_finetune.py \
 | 参数 | 推荐 | 说明 |
 |---|---|---|
 | `--data` | commands-macos.jsonl | 训练数据 |
-| `--model` | models/qwen3-0.6b-base | 基础模型（本地路径，需先下载 safetensors）|
+| `--model` | models/qwen2.5-coder-0.5b-instruct | 基础模型（本地路径，需先下载 safetensors）|
 | `--epochs` | 3 | 遍历数据次数 |
 | `--batch-size` | 48 | 单 batch；3080ti 显存大可以高 |
 | `--grad-accum` | 2 | 有效 batch = 48×2 = 96 |
@@ -118,7 +122,13 @@ python3 train/lora_finetune.py \
 | `--max-samples` | 0 | 0=全部；设小值快速实验 |
 
 ### 有效样本量估算
-macos 数据 27217 条 × `truncations=2` ≈ **5.4 万训练对**。0.6B + LoRA，3080ti 上约 **20-40 分钟/epoch**，3 epoch 约 1-2 小时。
+macos 数据 27217 条 × `truncations=2` ≈ **5.4 万训练对**。0.5B + LoRA，3080ti 上约 **20-40 分钟/epoch**，3 epoch 约 1-2 小时。
+
+### 基座模型选型（引用 `train_log_aug_9.md` 实测）
+
+- **✅ Qwen2.5-Coder-0.5B-Instruct**：loss 全量 6.74→0.754，输出全部合法命令续写（`pip→install`、`docker→compose down --rmi all`）
+- **❌ Qwen3-0.6B-Base**：loss 卡 3.0、乱码 token、复现不了。根因：Base 要连"对话格式"+"命令先验"两层一起学，0.5B 学不动；且 Qwen3 模板自带 `<think>` 污染输出
+- **教训**：选对基座 > 调参。Instruct/Coder 基座只差"任务"一层要学
 
 ---
 
@@ -129,7 +139,7 @@ macos 数据 27217 条 × `truncations=2` ≈ **5.4 万训练对**。0.6B + LoRA
 ```bash
 python3 train/lora_finetune.py \
     --data train/commands-macos.jsonl \
-    --model models/qwen3-0.6b-base \
+    --model models/qwen2.5-coder-0.5b-instruct \
     --output train/lora-macos-test \
     --max-samples 3000 --epochs 2 --batch-size 48 \
     --device cuda
@@ -169,21 +179,21 @@ git        -> 继续补 push/log/...
 python3 -c "
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
-base = AutoModelForCausalLM.from_pretrained('models/qwen3-0.6b-base', dtype='float16')
+base = AutoModelForCausalLM.from_pretrained('models/qwen2.5-coder-0.5b-instruct', dtype='float16')
 merged = PeftModel.from_pretrained(base, 'train/lora-macos').merged
-merged.save_pretrained('models/qwen3-0.6b-base-merged')
+merged.save_pretrained('models/qwen2.5-coder-0.5b-instruct-merged')
 "
 ```
 
 2. **转 GGUF**：用 llama.cpp 的转换脚本（如果你的环境有）：
 ```bash
 python3 llama.cpp/convert_hf_to_gguf.py \
-    models/qwen3-0.6b-base-merged --outfile models/qwen3-0.6b-base-finetuned.gguf --outtype q8_0
+    models/qwen2.5-coder-0.5b-instruct-merged --outfile models/qwen2.5-coder-0.5b-instruct-finetuned.gguf --outtype q8_0
 ```
 
 3. **更新 daemon 模型路径**，重启测试：
 ```bash
-SSC_MODEL_PATH=models/qwen3-0.6b-base-finetuned.gguf
+SSC_MODEL_PATH=models/qwen2.5-coder-0.5b-instruct-finetuned.gguf
 ```
 
 ---
