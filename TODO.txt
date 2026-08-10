@@ -88,3 +88,30 @@ safetensors，需转 GGUF）使其学会 shell 命令补全。
   （改用 `_ssc_active_request_id` + `_ssc_req_line`）。保留此记录供以后重构参考。
 - 近期根因：训练/推理 system prompt 不一致，导致 0.5B 模型退化（`#`/`..`）。
   已改为与训练对齐的 Qwen 默认 system prompt（方案①）。
+
+---
+
+## [待评估] idea：训练/推理 prompt 丰富化
+
+**现状**
+当前为"完整命令方案"，prompt 极简：`user=命令名±空格` → `assistant=完整命令`，
+无任务描述、无 few-shot。极简是刻意的（训练/推理易对齐、0.5B 对复杂指令不鲁棒）。
+
+**想法**
+prompt 也许太简单，加了任务描述/few-shot 后模型泛化可能更好，比如：
+```
+system: You are a shell command autocompletion engine. Given a command name,
+        output the full command a user would get when pressing tab.
+user:   git
+assistant: git status
+```
+
+**约束（关键）**
+- 0.5B 对陌生 system 指令不鲁棒（历史踩坑：`mv`→`#`）——改 system 必须
+  **训练端 + 推理端同步改**，且需小规模验证 loss/输出不退化。
+- 当前完整命令方案的效果（避免中间前缀跳词）不能因加 prompt 而退步。
+
+**方向（待验证）**
+- 加 system 任务描述 + 1-2 个 few-shot，训练/推理同步。
+- 先小样本对比 loss + 命令名±空格的前缀输出，确认优于极简 prompt 再全量。
+
