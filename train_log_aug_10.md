@@ -128,3 +128,39 @@ sbatch train/run_merge_gguf.sbatch   # 已含 merge_lora.py + convert_hf_to_gguf
 2. **gguf 包版本要与转换代码同源**：PyPI 版缺 `DFLASH`，必须用 llama.cpp 仓库的 `gguf-py/`
 3. **合并产物要补 BPE vocab**：`save_pretrained` 不写 `vocab.json`/`merges.txt`，转换前 `cp` 补齐
 4. **Qwen2.5 模板自动注入默认 system**，与推理端手动添加的保持一致即可，无需重训
+
+---
+
+## 十、完整命令契约重跑（2026-08-10 补记）
+
+> **背景**：上文第一~八节记录的训练实际跑在 **旧脚本**（`split_pairs` 生成 `(前缀, 后缀)`，模型预测后缀，见 commit `f019255` 之前）。
+> 随后训练方案/脚本更新为 **complete-command + 减法** 契约（`('git', 'git status')` / `('git ', 'git status')`，模型联想完整命令，daemon 减法得后缀）。
+> 因此 01:16~01:36 产出的 `train/lora-macos-coder`、`*-merged`、`*.gguf` **对新契约无效**，本轮用更新后的 `train/lora_finetune.py` 全流程重跑。
+
+### 重跑作业与结果
+
+| 阶段 | 作业 ID | 结果 |
+|---|---|---|
+| 快速验证（3000 样本, 2 epoch） | 4825494 | loss `2.811 → 0.757`，train_loss `1.284` |
+| 全量训练（macos 27217 条, 3 epoch, batch 48×2） | 4825505 | loss 终值 ~0.45，**train_loss `0.8603`**（旧契约 1.492），runtime 846s |
+| 评估（命令名±空格 + 减法） | 4825686 | 全部合法、无乱码（见下表） |
+| 合并 LoRA + 转 GGUF | 4825700 | 新 `models/qwen2.5-coder-0.5b-instruct-finetuned.gguf`（525MB, q8_0, 290 张量） |
+
+### 评估结果（4825686）
+
+| 输入 | 完整命令 | 减法后缀 | 评价 |
+|---|---|---|---|
+| `git` | `git diff-tree -r` | ` diff-tree -r` | ✅ 合法 |
+| `git ` | `git diff-tree -r` | `diff-tree -r` | ✅ 合法 |
+| `docker ` | `docker compose logs` | `compose logs` | ✅ 合理 |
+| `brew` / `brew ` | `brew info` | ` info` / `info` | ✅ 合理 |
+| `pip` / `pip ` | `pip install` | ` install` / `install` | ✅ 短前缀泛化正确 |
+| `kubectl` | `kubectl get` | ` get` | ✅ 合理 |
+| `kubectl ` | `kubectl drain --pod-selector =` | `drain --pod-selector =` | ⚠️ 合法但偏怪（数据里高频） |
+| `ls`/`npm`/`systemctl`/`cd`（无空格） | 只回命令名 | suffix 为空 | ✅ 符合预期（daemon 无建议） |
+
+### 说明
+
+- 新契约下模型输出比旧契约更"收敛"（train_loss 0.86 < 1.49），但 greedy 解码倾向单/双词命令（`git` → `diff-tree`）。
+- 产物已**覆盖**旧目录：`train/lora-macos-coder/`、`models/qwen2.5-coder-0.5b-instruct-merged/`、`models/qwen2.5-coder-0.5b-instruct-finetuned.gguf`。
+- 后续如需 daemon 端 Ghost Text 验证，需在本地机 `cargo build --release` 后替换模型路径重启。
