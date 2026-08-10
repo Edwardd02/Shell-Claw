@@ -204,7 +204,12 @@ _ssc_accept() {
     if [[ -n "$_ssc_suggestion" ]]; then
         BUFFER="$(_ssc_join_suggestion "$BUFFER" "$_ssc_suggestion")"
         CURSOR=${#BUFFER}
+        # 接受后失效所有在途请求:若之前请求的响应晚到,_ssc_active_request_id
+        # 已被置空,响应 id 不匹配会丢弃,不会复活 _ssc_suggestion 造成叠加。
+        _ssc_active_request_id=""
+        _ssc_req_line=""
         _ssc_clear_suggestion
+        _ssc_suggestion=""
         zle -R
     else
         zle ."$1"
