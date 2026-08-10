@@ -77,11 +77,10 @@ def extract_from_md(md_path: Path):
             yield cmd
 
 
-def collect_md_files(pages_dir: Path):
-    """收集所有英文页面的 .md 文件(排除多语言 pages.xx)。"""
+def collect_md_files(pages_dir: Path, dirs):
+    """收集指定目录下的 .md 文件。dirs 为子目录名列表,如 ["common","osx"]。"""
     md_files = []
-    # pages/common, pages/linux, pages/osx, pages/windows, pages/android
-    for d in ["common", "linux", "osx", "windows", "android"]:
+    for d in dirs:
         sub = pages_dir / d
         if sub.is_dir():
             md_files.extend(sorted(sub.glob("*.md")))
@@ -96,6 +95,9 @@ def main():
     parser.add_argument("--output", type=str,
                         default="train/commands.jsonl",
                         help="输出 JSONL 路径")
+    parser.add_argument("--dirs", type=str, nargs="+",
+                        default=["common", "osx"],
+                        help="要包含的 pages 子目录,如: --dirs common osx")
     args = parser.parse_args()
 
     pages_dir = Path(args.pages_dir)
@@ -106,7 +108,7 @@ def main():
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    md_files = collect_md_files(pages_dir)
+    md_files = collect_md_files(pages_dir, args.dirs)
     print(f"扫描到 {len(md_files)} 个英文 .md 文件")
 
     total = 0
