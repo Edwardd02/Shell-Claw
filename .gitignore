@@ -39,3 +39,6 @@ models/CACHEDIR.TAG
 __pycache__/
 *.pyc
 
+
+# Reference repo
+/zsh-llm-suggestions/

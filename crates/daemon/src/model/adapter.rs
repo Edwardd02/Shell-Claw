@@ -95,17 +95,48 @@ impl CompletionModel for LlamaCppAdapter {
             }
         };
 
-        // 减法:模型(LoRA)被训练成输出【完整命令】(如 "git status"),
-        // 而不是后缀。这里拿完整命令减去用户已输入前缀,得到待插入的后缀。
-        //   line_prefix="git"      + 模型"git status" -> " status"
-        //   line_prefix="git "     + 模型"git status" -> "status"
-        //   line_prefix="git che"  + 模型"git checkout" -> "ckout"
-        //   (中间前缀是已知局限,但完整命令联想是主体)
-        let suffix = if suffix.starts_with(&context.line_prefix) {
-            let rest = &suffix[context.line_prefix.len()..];
-            rest.to_string()
+        // 减法前先整齐化模型输出:去掉前导/尾随空白。
+        let out = suffix.trim();
+        if out.is_empty() {
+            return Err(ModelError::new("no valid suffix generated"));
+        }
+
+        // 减法 —— 按"模型输出 vs 用户输入"的三种前缀关系决定:
+        //   分支1 (模型输出以用户输入开头): 模型补全了剩余部分
+        //         out="git status", user="git " → suffix="status"
+        //         out="git status", user="git"  → suffix=" status"
+        //         减法得后缀。
+        //   分支2 (用户输入以模型输出开头, 且更长): 用户已打出超过模型建议
+        //         user="git commit ", out="git commit" → 无建议
+        //         用户输入比模型建议还完整, 无需补全 → 返回无建议。
+        //   分支3 (互不包含): 模型只输出纯后缀(漏了命令行首词)
+        //         user="git", out="diff-tree -r" → out 本就是待追加后缀
+        //         把 out 整体视为后缀, 渲染时 user+out 即可。
+        //         若 out 以 `-`/参数开头但明显不是命令名, 也视为后缀。
+        let suffix = if out.starts_with(&context.line_prefix) {
+            // 分支1: 模型输出长于用户输入, 减法
+            out[context.line_prefix.len()..].to_string()
+        } else if context.line_prefix.starts_with(out) && context.line_prefix != out {
+            // 分支2: 用户输入长于模型输出(已超出模型建议) → 无建议
+            tracing::debug!(
+                "no suggestion (user already typed beyond model); prefix={:?} out={:?}",
+                context.line_prefix, out
+            );
+            return Err(ModelError::new("user input already extends past model output"));
         } else {
-            suffix
+            // 分支3: 模型输出是独立后缀(漏了命令行首词, 如 user='git' out='diff-tree -r')
+            //         把它整体作为后缀。
+            tracing::debug!(
+                "model output used as bare suffix; prefix={:?} out={:?}",
+                context.line_prefix, out
+            );
+            // 若 out 首字符是字母/'-'(像是命令或参数), 前面补一个空格与 user 分隔
+            let first = out.chars().next().unwrap_or(' ');
+            if first.is_alphabetic() || first == '-' {
+                format!(" {out}")
+            } else {
+                out.to_string()
+            }
         };
 
         if suffix.is_empty() || !super::validate::validate_suffix(&suffix, &context.line_prefix) {
