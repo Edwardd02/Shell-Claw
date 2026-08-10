@@ -95,10 +95,12 @@ impl CompletionModel for LlamaCppAdapter {
             }
         };
 
-        // 归一化:0.5B instruct 模型常"复述整个命令"而非只接后缀。
-        // 若生成的文本以已输入前缀开头,剥掉前缀只留真正要追加的部分。
-        // 例如 line_prefix="git che",模型输出"git checkout main" ->
-        // 剥成"ckout main"(再补前导空格交给渲染层衔接)。
+        // 减法:模型(LoRA)被训练成输出【完整命令】(如 "git status"),
+        // 而不是后缀。这里拿完整命令减去用户已输入前缀,得到待插入的后缀。
+        //   line_prefix="git"      + 模型"git status" -> " status"
+        //   line_prefix="git "     + 模型"git status" -> "status"
+        //   line_prefix="git che"  + 模型"git checkout" -> "ckout"
+        //   (中间前缀是已知局限,但完整命令联想是主体)
         let suffix = if suffix.starts_with(&context.line_prefix) {
             let rest = &suffix[context.line_prefix.len()..];
             rest.to_string()
@@ -315,12 +317,18 @@ fn token_string_marker(t: &LlamaToken) -> bool {
 }
 
 fn clean_suffix(generated: &str) -> Option<String> {
-    let mut out = generated.trim_start_matches(' ').to_string();
+    // 注意:不去 trim 前导空格!训练数据(lora_finetune.py split_pairs)的后缀
+    // 是带前导空格的(如 ' push origin main'),且 Ghost Text 渲染 = BUFFER + suffix,
+    // 需要一个空格衔接(kubectl get 接 ' all' -> 'kubectl get all')。
+    // 若这里 trim 掉前导空格,会拼成 'kubectl getall'(缺空格 bug)。
+    let mut out = generated.to_string();
     if let Some(idx) = out.find('\n').or_else(|| out.find('\r')) {
         out.truncate(idx);
     }
     // 去掉模型的包裹字符(反引号/引号),instruct 模型常给输出加这些。
-    out = out.trim_matches(&['`', '\'', '"'][..]).to_string();
+    // 但是 DON'T trim 前导空格(那是补全衔接所需的)。
+    out = out.trim_end_matches(&['`', '\'', '"'][..]).to_string();
+    out = out.trim_start_matches(&['`', '\''][..]).to_string();
     if out.is_empty() {
         return None;
     }

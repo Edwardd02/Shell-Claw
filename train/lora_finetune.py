@@ -64,31 +64,29 @@ class LabelMaskedDataCollator(DataCollatorForLanguageModeling):
         return batch
 
 # 命令名(完整命令的第一个词)vs 完整命令的切分
-def split_pairs(cmd: str, truncations: int):
-    """把完整命令切成 (已输入前缀, 剩余后缀) 训练对,最多 truncations 个。
+def split_pairs(cmd: str, truncations: int = 2):
+    """生成 (输入前缀, 完整命令) 训练对。
 
-    推理时用户输入的是"打到一半的命令"(如 'git che'),模型要接出
-    'ckout main'。因此训练目标必须是同一任务:
-        'git push origin main' -> ('git', ' push origin main')
-                              -> ('git push', ' origin main')
-    后缀带前导空格,和 daemon 渲染 Ghost Text 的衔接一致。
+    关键思路变更:模型只学"联想完整命令",不管衔接点 ——
+    assistant 恒为【完整命令】(如 'git status')。
+    输入只覆盖"完整命令名 ± 尾随空格"两种:
+        ('git',    'git status')
+        ('git ',   'git status')
+    之后 daemon 推理做减法:补全 = 完整命令 - 用户当前输入。
+    这样模型不需要精确理解"用户打到哪",只学"该命令长什么样",
+    避免之前 'brew upgrad' -> '--all' 这种跳中间词的问题。
+
+    truncations 参数保留用于兼容,不再影响切分(detail:始终两种前缀)。
     """
     words = cmd.split()
-    n = len(words)
-    if n < 2:
+    if not words:
         return []
-    ks = {1}
-    if truncations >= 2 and n >= 3:
-        ks.add(max(2, n // 2))
-    if truncations >= 3 and n >= 4:
-        ks.add(n - 1)
-    pairs = []
-    for k in sorted(ks):
-        if k < n:
-            prefix = " ".join(words[:k])
-            suffix = " " + " ".join(words[k:])
-            pairs.append((prefix, suffix))
-    return pairs
+    first = words[0]          # 命令名,如 'git'
+    samples = [
+        (first, cmd),         # 无空格: git      -> git status
+        (f"{first} ", cmd),   # 尾随空格: git  -> git status
+    ]
+    return samples
 
 
 def clean_cmd(cmd: str) -> str:
@@ -97,7 +95,7 @@ def clean_cmd(cmd: str) -> str:
 
 
 def build_dataset(jsonl: Path, truncations: int = 2):
-    """从 commands.jsonl 构建 (prefix, suffix) 训练样本列表。"""
+    """从 commands.jsonl 构建 (输入前缀, 完整命令) 训练样本列表。"""
     samples = []
     with open(jsonl, encoding="utf-8") as f:
         for line in f:
@@ -111,22 +109,24 @@ def build_dataset(jsonl: Path, truncations: int = 2):
             cmd = clean_cmd(obj.get("cmd", ""))
             if not cmd:
                 continue
-            for prefix, suffix in split_pairs(cmd, truncations):
-                if not prefix or not suffix:
+            for prefix, full_cmd in split_pairs(cmd, truncations):
+                if not prefix or not full_cmd:
                     continue
-                samples.append((prefix, suffix))
+                samples.append((prefix, full_cmd))
     return samples
 
 
-def tokenize_sample(tokenizer, prefix: str, suffix: str, max_length: int):
-    """构造 Qwen chat 格式: user=已输入前缀, assistant=剩余后缀。
+def tokenize_sample(tokenizer, prefix: str, full_cmd: str, max_length: int):
+    """构造 Qwen chat 格式: user=输入前缀, assistant=【完整命令】。
 
-    关键:手工设置 labels,把 prompt(用户输入部分)全部置 -100,
-    只对 assistant 回复计算 loss,避免模型学"复读用户输入"。
+    关键:assistant 是完整命令(如 'git status'),模型学的是"联想完整命令"。
+    手工设置 labels: 只对 assistant(完整命令)部分计算 loss,
+    user 输入前缀部分置 -100(不监督,避免干扰)。
+    注意:assistant 包含复读的命令名前缀(如 'git'),这是应有的(模型要输出完整命令)。
     """
     messages = [
         {"role": "user", "content": prefix},
-        {"role": "assistant", "content": suffix},
+        {"role": "assistant", "content": full_cmd},
     ]
     text = tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=False
