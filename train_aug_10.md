@@ -11,22 +11,28 @@
 
 ## 一、训练目标（用什么格式做补全）
 
-用 **`(已输入前缀, 剩余后缀)`** 的配对训练，贴合真实交互：
+用 **`(命令名±空格, 完整命令)`** 的配对训练，让模型**联想完整命令**，再由 daemon 做减法：
 
 ```
-用户打到 "git che"  →  补 "ckout main"
-用户打到 "git"      →  补 " push origin main"
+用户打到 "git"    →  模型输出完整 "git status" → 减法得后缀 " status"
+用户打到 "git "   →  模型输出完整 "git status" → 减法得后缀 "status"
 ```
 
-具体地，`lora_finetune.py` 的 `split_pairs` 会把一条命令切成多个训练对：
+> **关键变更（重要）**：模型不再预测"光标后的后缀"，而是学习"完整命令是什么"。
+> 原因：0.5B 模型学"后缀"时会在中间前缀处跳词（如 `brew upgrad` → `--all`，漏 `e`）。
+> 改成"联想完整命令"后，减法（完整命令 − 前缀）是确定性的，不依赖模型理解衔接点。
+
+具体地，`lora_finetune.py` 的 `split_pairs` 对每条命令生成两种前缀：
 
 ```
-'git push origin main'  →  ('git', ' push origin main')     # 只打了第1个词
-                        →  ('git push', ' origin main')     # 打了前2个词
+'git status'  →  ('git',    'git status')   # 无空格
+              →  ('git ',   'git status')   # 带尾随空格
 ```
 
-> 关键设计：**后缀带前导空格**（` push origin main`），和 daemon 渲染 Ghost Text 时的衔接一致。
-> 且只监督 assistant 输出（prompt 部分 label 置 -100），避免模型"复读用户输入"。
+> 关键设计：
+> - assistant 恒为**完整命令**（含复读的命令名前缀，这是模型该复读的）。
+> - 只监督 assistant 输出（prompt 部分 label 置 -100）。
+> - 减法在 daemon `adapter.rs` 做：`suffix = 完整命令 − line_prefix`。
 
 ---
 
@@ -34,8 +40,8 @@
 
 ### 训练时（tokenize_sample）
 ```
-user:       git che
-assistant:  ckout main
+user:       git
+assistant:  git status          # 完整命令(非后缀!)
 ```
 - 已通过 Qwen chat template 包成 `<|im_start|>user ... <|im_start|>assistant ...`
 - **不额外加 system**（或只用训练时见过的 Qwen 默认 system）
@@ -47,11 +53,13 @@ assistant:  ckout main
 ```rust
 let system = "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.";  // 训练用的 Qwen 默认
 let user = prefix;   // 用户已输入的前缀
-// apply_chat_template(add_ass=true) -> 末尾加 assistant 起始符,模型续后缀
+// apply_chat_template(add_ass=true) -> 末尾加 assistant 起始符,模型续完整命令
+// 模型输出完整命令后,adapter 做减法得出 suffix
 ```
 
 > **红线**：推理的 system prompt 必须 = 训练时的 system prompt。
 > 0.5B 模型对"没见过的指令"毫无鲁棒性 —— 换一个 system 就会随机吐 `#`/`..`。
+> 推理时模型输出【完整命令】，`adapter.rs` 里减法得后缀。
 
 ---
 
