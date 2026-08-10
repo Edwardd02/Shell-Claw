@@ -110,7 +110,15 @@ _ssc_request() {
     # Write the request to the persistent socket fd.
     _ssc_log "REQ(hook) >>> ${payload}"
     _ssc_log_interaction "INPUT" "$line"
-    print -u "$_ssc_fd" -r -- "$payload"
+    # 静默写入:若 fd 已失效(daemon 重启/socket 断开),写会 failed 并可能打印
+    # broken pipe 污染终端。捕获错误:不打印、不报错,仅重置连接状态,下次请求
+    # 重新连接。shell 输入绝不能因 daemon 问题被打断。
+    if ! { print -u "$_ssc_fd" -r -- "$payload"; } 2>/dev/null; then
+        _ssc_connected=0
+        builtin exec {_ssc_fd}>&- 2>/dev/null || true
+        _ssc_fd=-1
+        _ssc_log "write failed (broken pipe); reconnecting next request"
+    fi
 }
 
 _ssc_handle_response() {
