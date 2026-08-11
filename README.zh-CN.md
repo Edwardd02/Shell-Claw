@@ -16,6 +16,8 @@
 [![macOS](https://img.shields.io/badge/macOS-✓-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Linux](https://img.shields.io/badge/Linux-开发中-8A8A8A?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
 
+**[English](README.md)** &nbsp;·&nbsp; **[简体中文](README.zh-CN.md)** &nbsp;·&nbsp; **[日本語](README.ja.md)**
+
 **[快速开始](#-快速开始)** &nbsp;·&nbsp; **[功能特性](#-功能特性)** &nbsp;·&nbsp; **[架构](#-架构)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[安装](#-安装)** &nbsp;·&nbsp; **[隐私](#-隐私--数据安全)** &nbsp;·&nbsp; **[FAQ](#-faq)**
 
 </div>
@@ -189,11 +191,3 @@ zsh-autosuggestions 基于 shell 历史机械匹配;ShellClaw 额外结合本地
 欢迎使用 ShellClaw!如果它让终端用起来更顺手,给个 ⭐ 就是最好的支持。
 
 **[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[报告问题](https://github.com/Edwardd02/Shell-Claw/issues)**
-
----
-
-<div align="center">
-
-[English](README.md) &nbsp;·&nbsp; [简体中文](README.zh-CN.md) &nbsp;·&nbsp; [日本語](README.ja.md)
-
-</div>

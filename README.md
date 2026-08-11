@@ -17,6 +17,8 @@
 [![macOS](https://img.shields.io/badge/macOS-✓-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Linux](https://img.shields.io/badge/Linux-Development-8A8A8A?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
 
+**[English](README.md)** &nbsp;·&nbsp; **[简体中文](README.zh-CN.md)** &nbsp;·&nbsp; **[日本語](README.ja.md)**
+
 **[Quick Start](#-quick-start)** &nbsp;·&nbsp; **[Features](#-features)** &nbsp;·&nbsp; **[Architecture](#-architecture)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[Install](#-install)** &nbsp;·&nbsp; **[Privacy](#-privacy--data-safety)** &nbsp;·&nbsp; **[FAQ](#-faq)**
 
 </div>
@@ -191,11 +193,3 @@ zsh-autosuggestions matches mechanically against shell history. ShellClaw additi
 Thanks for checking out ShellClaw! If it makes your terminal nicer to use, a star is the best support.
 
 **[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[Report an issue](https://github.com/Edwardd02/Shell-Claw/issues)**
-
----
-
-<div align="center">
-
-[English](README.md) &nbsp;·&nbsp; [简体中文](README.zh-CN.md) &nbsp;·&nbsp; [日本語](README.ja.md)
-
-</div>

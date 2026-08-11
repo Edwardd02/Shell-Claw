@@ -17,6 +17,8 @@
 [![macOS](https://img.shields.io/badge/macOS-✓-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Linux](https://img.shields.io/badge/Linux-開発中-8A8A8A?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
 
+**[English](README.md)** &nbsp;·&nbsp; **[简体中文](README.zh-CN.md)** &nbsp;·&nbsp; **[日本語](README.ja.md)**
+
 **[クイックスタート](#-クイックスタート)** &nbsp;·&nbsp; **[機能](#-機能)** &nbsp;·&nbsp; **[アーキテクチャ](#-アーキテクチャ)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[インストール](#-インストール)** &nbsp;·&nbsp; **[プライバシー](#-プライバシー--データ安全性)** &nbsp;·&nbsp; **[FAQ](#-faq)**
 
 </div>
@@ -190,11 +192,3 @@ zsh-autosuggestions はシェル履歴に機械的にマッチします。ShellC
 ShellClaw をありがとうございます。ターミナルが使いやすくなったら、スターが最高の応援になります。
 
 **[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[Issue を報告](https://github.com/Edwardd02/Shell-Claw/issues)**
-
----
-
-<div align="center">
-
-[English](README.md) &nbsp;·&nbsp; [简体中文](README.zh-CN.md) &nbsp;·&nbsp; [日本語](README.ja.md)
-
-</div>
