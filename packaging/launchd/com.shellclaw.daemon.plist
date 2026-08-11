@@ -3,21 +3,22 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.smart-shell-copilot.daemon</string>
+    <string>com.shellclaw.daemon</string>
 
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/smart-shell-copilot-daemon</string>
+        <string>/opt/homebrew/bin/shellclaw</string>
+        <string>daemon</string>
     </array>
 
     <key>EnvironmentVariables</key>
     <dict>
-        <key>SSC_SOCKET_PATH</key>
-        <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot/daemon.sock</string>
-        <key>SSC_MODEL_PATH</key>
-        <string>/opt/homebrew/share/smart-shell-copilot/models/qwen2.5-coder-0.5b-instruct-finetuned.gguf</string>
-        <key>SSC_DATA_DIR</key>
-        <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot</string>
+        <key>SHELLCLAW_SOCKET_PATH</key>
+        <string>/Users/PLACEHOLDER_USER/.shellclaw/daemon.sock</string>
+        <key>SHELLCLAW_MODEL_PATH</key>
+        <string>/opt/homebrew/share/shellclaw/models/qwen2.5-coder-0.5b-instruct-finetuned.gguf</string>
+        <key>SHELLCLAW_DATA_DIR</key>
+        <string>/Users/PLACEHOLDER_USER/.shellclaw</string>
     </dict>
 
     <key>RunAtLoad</key>
@@ -27,10 +28,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot/daemon.log</string>
+    <string>/Users/PLACEHOLDER_USER/.shellclaw/daemon.stdout.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/PLACEHOLDER_USER/.smart-shell-copilot/daemon.error.log</string>
+    <string>/Users/PLACEHOLDER_USER/.shellclaw/daemon.stderr.log</string>
 
     <key>WorkingDirectory</key>
     <string>/Users/PLACEHOLDER_USER</string>

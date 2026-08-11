@@ -1,40 +1,30 @@
-# Model Files
+# Model
 
-Smart Shell Copilot uses a local edge model for command completion inference.
+ShellClaw 使用一个本地边缘模型做命令补全推理。
 
-## Primary Model
+## 推荐模型
 
-**Qwen/Qwen2.5-Coder-0.5B-Instruct (fine-tuned for shell completion)**
+**Qwen/Qwen2.5-Coder-0.5B-Instruct（微调用于 shell 补全）**
 
-- Repository: https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct
-- Expected memory: ~500MB
-- Hardware acceleration: Metal (macOS), AVX2 (Linux)
+- 仓库：https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct
+- 量化后约 500MB
+- 加速：Metal（macOS）、AVX2（Linux）
 
-> **Why not Qwen3-0.6B-Base?** Base model can't learn chat format + command
-> prior at 0.5B scale (loss stuck at 3.0, garbage tokens). Coder-Instruct base
-> only needs to learn the task layer (loss 6.74 → 0.75). See `train_aug_10.md`.
+## 获取
 
-## Fallback Model
+1. 下载 GGUF 量化文件：
+   - 参考文件：`qwen2.5-coder-0.5b-instruct-finetuned.gguf`
+2. 放到 `~/.shellclaw/models/`（或任意路径，用 `SHELLCLAW_MODEL_PATH` 指定）。
+3. 重启 ShellClaw 使配置生效。
 
-**Qwen3-0.6B-Base**
+## 模型路径
 
-- Repository: https://huggingface.co/Qwen/Qwen3-0.6B-Base
-- Used if the primary model misses TTFT or memory gates
-
-## Acquisition
-
-1. Download the GGUF quantized file from the repository.
-2. Place it in this directory as `qwen2.5-coder-0.5b-instruct-finetuned.gguf` (or `qwen3-0.6b-base.gguf` for fallback).
-3. Update the daemon config model path to point to this file.
-
-## Conversion
-
-If a GGUF file is not available, convert using:
+默认模型路径可在环境变量中覆盖：
 
 ```bash
-python convert.py <model_dir> --outtype q8_0
+export SHELLCLAW_MODEL_PATH=/path/to/model.gguf
 ```
 
-## License Compliance
+## 许可
 
-Ensure compliance with the model's license before distribution or redistribution.
+分发/再分发前请遵守模型自身的许可证。

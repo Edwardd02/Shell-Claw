@@ -1,9 +1,9 @@
-# Smart Shell Copilot — Bash hook
+# ShellClaw — Bash hook
 #
 # Non-blocking Ghost Text completion integration.
 # Silently no-ops if the daemon socket is unavailable.
 
-SSC_SOCKET="${SSC_SOCKET:-/tmp/smart-shell-copilot.sock}"
+SSC_SOCKET="${SSC_SOCKET:-/tmp/shellclaw.sock}"
 SSC_DEADLINE_MS="${SSC_DEADLINE_MS:-25}"
 
 _ssc_session_id="ssc-$$"

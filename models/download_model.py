@@ -1,5 +1,5 @@
 """
-Download the local edge model for Smart Shell Copilot.
+Download the local edge model for ShellClaw.
 
 Usage: python download_model.py
 """

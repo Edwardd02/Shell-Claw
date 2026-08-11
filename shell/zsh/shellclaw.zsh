@@ -1,10 +1,10 @@
-# Smart Shell Copilot — Zsh hook
+# ShellClaw — Zsh hook
 #
 # Non-blocking Ghost Text completion integration using zle -F for async response
 # handling inside the zle event loop. Silently no-ops if the daemon socket is
 # unavailable.
 
-SSC_SOCKET="${SSC_SOCKET:-/tmp/smart-shell-copilot.sock}"
+SSC_SOCKET="${SSC_SOCKET:-/tmp/shellclaw.sock}"
 SSC_DEADLINE_MS="${SSC_DEADLINE_MS:-2000}"
 
 # ---- 调试日志 ----
@@ -15,7 +15,7 @@ if [[ -z "$SSC_HOOK_LOG" ]]; then
     # 由 hook 脚本路径推导项目根目录(…/shell/zsh/xxx.zsh 向上两级)
     case "$0" in
         /*/*) _ssc_hook_root="${0%/shell/zsh/*}"; SSC_HOOK_LOG="$_ssc_hook_root/logs/hook.log" ;;
-        *)    SSC_HOOK_LOG="$HOME/smart-shell-copilot-hook.log" ;;
+        *)    SSC_HOOK_LOG="$HOME/.shellclaw/hook.log" ;;
     esac
 fi
 
@@ -25,7 +25,7 @@ fi
 if [[ -z "$SSC_INTERACTION_LOG" ]]; then
     case "$0" in
         /*/*) _ssc_hook_root2="${0%/shell/zsh/*}"; SSC_INTERACTION_LOG="$_ssc_hook_root2/logs/interaction.log" ;;
-        *)    SSC_INTERACTION_LOG="$HOME/smart-shell-copilot-interaction.log" ;;
+        *)    SSC_INTERACTION_LOG="$HOME/.shellclaw/interaction.log" ;;
     esac
 fi
 

@@ -6,11 +6,10 @@ pub struct DaemonConfig {
     pub model_path: PathBuf,
     pub db_path: PathBuf,
     pub log_path: PathBuf,
+    pub log_enabled: bool,
     pub max_line_length: usize,
     pub default_deadline_ms: u64,
     pub ranking_weights: RankingWeights,
-    /// 是否启用本地命令记忆。设 SSС_DISABLE_MEMORY=1 关闭,请求将只走模型推理。
-    pub memory_enabled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -32,74 +31,107 @@ impl Default for RankingWeights {
     }
 }
 
+/// ShellClaw 用户数据目录: `~/.shellclaw/`
+pub fn data_dir() -> PathBuf {
+    let home = std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("/tmp"));
+    std::env::var("SHELLCLAW_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| home.join(".shellclaw"))
+}
+
+/// 配置文件路径: `~/.shellclaw/config`
+pub fn config_path() -> PathBuf {
+    data_dir().join("config")
+}
+
 impl Default for DaemonConfig {
     fn default() -> Self {
         Self {
-            socket_path: PathBuf::from("/tmp/smart-shell-copilot.sock"),
+            socket_path: PathBuf::from("/tmp/shellclaw.sock"),
             model_path: PathBuf::from("models/qwen2.5-coder-0.5b-instruct-finetuned.gguf"),
-            db_path: dirs_fallback(),
-            log_path: dirs_fallback(),
+            db_path: data_dir().join("memory.db"),
+            log_path: data_dir().join("daemon.log"),
+            log_enabled: false,
             max_line_length: 4096,
             default_deadline_ms: 25,
             ranking_weights: RankingWeights::default(),
-            memory_enabled: true,
         }
     }
 }
 
-fn dirs_fallback() -> PathBuf {
-    dirs_home().join(".smart-shell-copilot")
-}
-
-fn dirs_home() -> PathBuf {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"))
-}
-
 impl DaemonConfig {
+    /// 读取用户配置 + 环境变量,构造 daemon 配置。
     pub fn load() -> Self {
-        let socket_path = std::env::var("SSC_SOCKET_PATH")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/tmp/smart-shell-copilot.sock"));
+        let base = data_dir();
 
-        let model_path = std::env::var("SSC_MODEL_PATH")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("models/qwen2.5-coder-0.5b-instruct-finetuned.gguf"));
+        // 读 ~/.shellclaw/config 判断日志开关
+        let log_enabled = read_config_bool("log_enabled");
 
-        let home = dirs_home();
-        let base = std::env::var("SSC_DATA_DIR")
+        let socket_path = std::env::var("SHELLCLAW_SOCKET_PATH")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| home.join(".smart-shell-copilot"));
+            .unwrap_or_else(|_| PathBuf::from("/tmp/shellclaw.sock"));
+
+        let model_path = std::env::var("SHELLCLAW_MODEL_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                PathBuf::from("models/qwen2.5-coder-0.5b-instruct-finetuned.gguf")
+            });
 
         let db_path = base.join("memory.db");
-
-        // 日志目录:SSC_LOG_DIR 优先;否则默认项目根下 logs/(相对当前工作目录)。
-        // 典型:从项目根 `./target/release/daemon` 启动 → ./logs/daemon.log
-        let log_dir = std::env::var("SSC_LOG_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("logs"));
-        let log_path = log_dir.join("daemon.log");
+        let log_path = base.join("daemon.log");
 
         Self {
             socket_path,
             model_path,
             db_path,
             log_path,
-            max_line_length: std::env::var("SSC_MAX_LINE_LENGTH")
+            log_enabled,
+            max_line_length: std::env::var("SHELLCLAW_MAX_LINE_LENGTH")
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(4096),
-            default_deadline_ms: std::env::var("SSC_DEADLINE_MS")
+            default_deadline_ms: std::env::var("SHELLCLAW_DEADLINE_MS")
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(25),
             ranking_weights: RankingWeights::default(),
-            memory_enabled: !matches!(
-                std::env::var("SSC_DISABLE_MEMORY")
-                    .as_deref(),
-                Ok("1") | Ok("true") | Ok("TRUE")
-            ),
         }
     }
+}
+
+/// 从 ~/.shellclaw/config 读一个布尔配置项。
+fn read_config_bool(key: &str) -> bool {
+    let cfg = config_path();
+    let content = std::fs::read_to_string(cfg).unwrap_or_default();
+    for line in content.lines() {
+        let line = line.trim();
+        if let Some((k, v)) = line.split_once('=') {
+            if k.trim() == key {
+                return matches!(v.trim(), "1" | "true" | "yes" | "on");
+            }
+        }
+    }
+    false
+}
+
+/// 写入配置布尔项(用于 shellclaw log on/off 持久化)。
+pub fn set_config_bool(key: &str, enabled: bool) -> std::io::Result<()> {
+    let cfg = config_path();
+    if let Some(parent) = cfg.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    // 读取现有配置,保留其他项,更新目标项
+    let mut lines: Vec<String> = std::fs::read_to_string(&cfg)
+        .map(|s| s.lines().map(String::from).collect())
+        .unwrap_or_default();
+    let value = if enabled { "1" } else { "0" };
+    let new_line = format!("{key}={value}");
+    if let Some(idx) = lines.iter().position(|l| l.trim().starts_with(&format!("{key}="))) {
+        lines[idx] = new_line;
+    } else {
+        lines.push(new_line);
+    }
+    std::fs::write(&cfg, lines.join("\n") + "\n")
 }
