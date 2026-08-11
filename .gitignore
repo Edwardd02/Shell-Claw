@@ -1,4 +1,4 @@
-target/
+/target/
 *.gguf
 *.sock
 *.db
@@ -17,28 +17,20 @@ Thumbs.db
 
 # Model files & HuggingFace cache (large, regenerable)
 models/*.gguf
-models/models--*/
 models/*/
 models/.cache/
 models/.locks/
 models/CACHEDIR.TAG
 
-# Local daemon runtime
+# Local daemon runtime data
 .smart-shell-copilot/
 
-# Downloaded reference repo (vllm) & runtime logs
-/vllm/
-/logs/
-
-# Training: 原始 tldr 数据源(可重新 git clone) + 微调大权重(可再生)
-/tldr/
-/train/lora-*/
-/train/*/checkpoint-*
-
-# Python 缓存
+# Python cache
 __pycache__/
 *.pyc
 
+# Local logs
+/logs/
 
-# Reference repo
-/zsh-llm-suggestions/
+# Derived data / docs (empty at publish, filled over time)
+/tests_scratch/

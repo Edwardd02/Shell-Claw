@@ -3,5 +3,4 @@ resolver = "2"
 members = [
     "crates/daemon",
     "crates/protocol",
-    "crates/bench-harness",
 ]
