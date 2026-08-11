@@ -15,7 +15,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![macOS](https://img.shields.io/badge/macOS-✓-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
-[![Linux](https://img.shields.io/badge/Linux-开发中-8A8A8A?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
+[![Linux](https://img.shields.io/badge/Linux-Development-8A8A8A?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
 
 **[Quick Start](#-quick-start)** &nbsp;·&nbsp; **[Features](#-features)** &nbsp;·&nbsp; **[Architecture](#-architecture)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[Install](#-install)** &nbsp;·&nbsp; **[Privacy](#-privacy--data-safety)** &nbsp;·&nbsp; **[FAQ](#-faq)**
 
