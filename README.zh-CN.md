@@ -19,119 +19,17 @@
 
 **[English](README.md)** &nbsp;·&nbsp; **[简体中文](README.zh-CN.md)** &nbsp;·&nbsp; **[日本語](README.ja.md)**
 
-**[快速开始](#-快速开始)** &nbsp;·&nbsp; **[功能特性](#-功能特性)** &nbsp;·&nbsp; **[架构](#-架构)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[安装](#-安装)** &nbsp;·&nbsp; **[隐私](#-隐私--数据安全)** &nbsp;·&nbsp; **[FAQ](#-faq)**
+**[安装](#-安装)** &nbsp;·&nbsp; **[使用](#-使用)** &nbsp;·&nbsp; **[快速开始](#-快速开始)** &nbsp;·&nbsp; **[功能特性](#-功能特性)** &nbsp;·&nbsp; **[架构](#-架构)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[隐私](#-隐私--数据安全)** &nbsp;·&nbsp; **[FAQ](#-faq)**
 
 </div>
 
 ---
-
-## 🚀 快速开始
-
-打开你的终端，试着输入一个命令的开头：
-
-```
-$ git che【光标在此，灰色提示 ckout main】
-```
-
-如果 ShellClaw 已经安装，灰色补全会浮现在光标右侧。按 **Tab** 或 **右箭头** 接受，或者无视它继续打字。
-
-```bash
-# 1. 安装(见下方安装章节)
-# 2. 启动 daemon
-shellclaw start
-
-# 3. 状态确认
-shellclaw status
-# → shellclaw: running
-
-# 4. 开一个新的终端,开始使用!
-```
-
-> 命令记忆会在你执行命令时自动积累——越用，补全越懂你的习惯。
-
----
-
-## ✨ 功能特性
-
-| 能力 | 说明 |
-|------|------|
-| **本地 LLM 补全** | 一个本地语言模型（llama.cpp）负责生成补全,而非固定规则——它理解 shell 命令并推断下一个词 |
-| **记忆增强** | SQLite 命令记忆按你自己真正用过的命令重排,让 LLM 更快更贴合——频率、时效、目录相关性 |
-| **Ghost Text 体验** | 灰色单行提示紧跟光标,绝不打断你的输入 |
-| **接受键** | `Tab` 或 `右箭头` 立即接受;继续打字则无缝替换或清除 |
-| **非阻塞** | 补全请求异步进行,即便 daemon 卡死,shell 输入也完全不受影响 |
-| **静默降级** | daemon 缺失/超时/异常时,shell 自动回退原生行为,零报错、零打断 |
-| **隐私安全** | LLM + 记忆 100% 本地运行,数据绝不出机器 |
-| **Zsh / Bash** | 两大主流 shell 原生支持 |
-
----
-
-## 🏗️ 架构
-
-```
-用户键盘 → Shell Hook(zle) → Unix Socket → Rust Daemon
-                                        ↓
-              SQLite 命令记忆(FTS5) — 重排 + 个人先验
-                                        ↓
-              本地 LLM(llama.cpp) — 补全大脑
-                                        ↓
-                            返回补全后缀 → Hook 渲染 Ghost Text
-```
-
-三层关注点分离:
-
-- **Shell Hook**: 监听按键、去抖、发请求、渲染灰色补全,绝不影响 shell 主输入
-- **Rust Daemon**: 常驻后台,驱动本地 LLM + 记忆,通过 Unix Socket 与 hook 通信
-- **本地 LLM + 记忆**: llama.cpp 推理 + SQLite 记忆,全部本地
-
-**数据流(单次补全)**:
-
-```
-你在终端输入 "git che"
-   ↓ 停止片刻(防抖)
-Hook 发送 JSON-RPC completion.request
-   ↓
-Daemon 从记忆检索相关命令(快速、个性化)
-   ↓
-本地 LLM 以这些记忆候选为依据,生成补全
-   ↓
-返回后缀 "ckout main" → Hook 在光标右侧渲染灰色 "ckout main"
-  按 Tab/→ 接受, 或继续打字 清除
-```
-
----
-
-## 🛠️ CLI
-
-`shellclaw` 是一个自包含二进制,支持子命令:
-
-```bash
-shellclaw daemon          前台运行 daemon(供服务管理器调用)
-shellclaw start           后台启动 daemon
-shellclaw stop            停止 daemon
-shellclaw status          查看运行状态
-shellclaw log on|off      开启/关闭文件日志(持久化)
-shellclaw help            帮助
-```
-
-```bash
-# 日志默认关闭(干净);诊断问题时开启
-shellclaw log on
-shellclaw start
-# → ~/.shellclaw/daemon.log 开始记录
-
-# 平时保持关闭
-shellclaw log off
-```
-
----
-
 ## 📦 安装
 
 ### 方式一:Homebrew(推荐)
 
 ```bash
-brew tap Edwardd02/homebrew-shellclaw
+brew tap --trusted Edwardd02/homebrew-shellclaw
 brew install shellclaw
 ```
 
@@ -152,6 +50,8 @@ git clone https://github.com/Edwardd02/Shell-Claw.git
 cd Shell-Claw
 cargo build --release
 ```
+
+---
 
 ---
 
@@ -216,11 +116,124 @@ rm -rf ~/.shellclaw    # 清空全部数据和模型(零残留)
 
 ---
 
+---
+
+## 🚀 快速开始
+
+打开你的终端，试着输入一个命令的开头：
+
+```
+$ git che【光标在此，灰色提示 ckout main】
+```
+
+如果 ShellClaw 已经安装，灰色补全会浮现在光标右侧。按 **Tab** 或 **右箭头** 接受，或者无视它继续打字。
+
+```bash
+# 1. 安装(见下方安装章节)
+# 2. 启动 daemon
+shellclaw start
+
+# 3. 状态确认
+shellclaw status
+# → shellclaw: running
+
+# 4. 开一个新的终端,开始使用!
+```
+
+> 命令记忆会在你执行命令时自动积累——越用，补全越懂你的习惯。
+
+---
+
+---
+
+## ✨ 功能特性
+
+| 能力 | 说明 |
+|------|------|
+| **本地 LLM 补全** | 一个本地语言模型（llama.cpp）负责生成补全,而非固定规则——它理解 shell 命令并推断下一个词 |
+| **记忆增强** | SQLite 命令记忆按你自己真正用过的命令重排,让 LLM 更快更贴合——频率、时效、目录相关性 |
+| **Ghost Text 体验** | 灰色单行提示紧跟光标,绝不打断你的输入 |
+| **接受键** | `Tab` 或 `右箭头` 立即接受;继续打字则无缝替换或清除 |
+| **非阻塞** | 补全请求异步进行,即便 daemon 卡死,shell 输入也完全不受影响 |
+| **静默降级** | daemon 缺失/超时/异常时,shell 自动回退原生行为,零报错、零打断 |
+| **隐私安全** | LLM + 记忆 100% 本地运行,数据绝不出机器 |
+| **Zsh / Bash** | 两大主流 shell 原生支持 |
+
+---
+
+---
+
+## 🏗️ 架构
+
+```
+用户键盘 → Shell Hook(zle) → Unix Socket → Rust Daemon
+                                        ↓
+              SQLite 命令记忆(FTS5) — 重排 + 个人先验
+                                        ↓
+              本地 LLM(llama.cpp) — 补全大脑
+                                        ↓
+                            返回补全后缀 → Hook 渲染 Ghost Text
+```
+
+三层关注点分离:
+
+- **Shell Hook**: 监听按键、去抖、发请求、渲染灰色补全,绝不影响 shell 主输入
+- **Rust Daemon**: 常驻后台,驱动本地 LLM + 记忆,通过 Unix Socket 与 hook 通信
+- **本地 LLM + 记忆**: llama.cpp 推理 + SQLite 记忆,全部本地
+
+**数据流(单次补全)**:
+
+```
+你在终端输入 "git che"
+   ↓ 停止片刻(防抖)
+Hook 发送 JSON-RPC completion.request
+   ↓
+Daemon 从记忆检索相关命令(快速、个性化)
+   ↓
+本地 LLM 以这些记忆候选为依据,生成补全
+   ↓
+返回后缀 "ckout main" → Hook 在光标右侧渲染灰色 "ckout main"
+  按 Tab/→ 接受, 或继续打字 清除
+```
+
+---
+
+---
+
+## 🛠️ CLI
+
+`shellclaw` 是一个自包含二进制,支持子命令:
+
+```bash
+shellclaw daemon          前台运行 daemon(供服务管理器调用)
+shellclaw start           后台启动 daemon
+shellclaw stop            停止 daemon
+shellclaw status          查看运行状态
+shellclaw log on|off      开启/关闭文件日志(持久化)
+shellclaw help            帮助
+```
+
+```bash
+# 日志默认关闭(干净);诊断问题时开启
+shellclaw log on
+shellclaw start
+# → ~/.shellclaw/daemon.log 开始记录
+
+# 平时保持关闭
+shellclaw log off
+```
+
+---
+
+---
+
 ## 🔒 隐私 & 数据安全
 
 - **纯本地**: 命令记忆(SQLite) 和 模型推理全部在机器内完成,数据绝不外传
 - **无遥测**: 不收集任何使用数据
 - **可卸载**: 删除 `~/.shellclaw/` 即可清空全部数据和配置(零残留)
+
+---
 
 ---
 
@@ -245,6 +258,8 @@ zsh-autosuggestions 机械地从 shell 历史里回显单词。**ShellClaw 用�
 
 ---
 
+---
+
 ## 📄 License
 
 [MIT License](LICENSE) © 2026 Edwardd02
@@ -254,3 +269,4 @@ zsh-autosuggestions 机械地从 shell 历史里回显单词。**ShellClaw 用�
 欢迎使用 ShellClaw!如果它让终端用起来更顺手,给个 ⭐ 就是最好的支持。
 
 **[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[报告问题](https://github.com/Edwardd02/Shell-Claw/issues)**
+

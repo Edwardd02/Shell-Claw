@@ -20,122 +20,17 @@
 
 **[English](README.md)** &nbsp;·&nbsp; **[简体中文](README.zh-CN.md)** &nbsp;·&nbsp; **[日本語](README.ja.md)**
 
-**[Quick Start](#-quick-start)** &nbsp;·&nbsp; **[Features](#-features)** &nbsp;·&nbsp; **[Architecture](#-architecture)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[Install](#-install)** &nbsp;·&nbsp; **[Privacy](#-privacy--data-safety)** &nbsp;·&nbsp; **[FAQ](#-faq)**
+**[Install](#-install)** &nbsp;·&nbsp; **[Usage](#-usage)** &nbsp;·&nbsp; **[Quick Start](#-quick-start)** &nbsp;·&nbsp; **[Features](#-features)** &nbsp;·&nbsp; **[Architecture](#-architecture)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[Privacy](#-privacy--data-safety)** &nbsp;·&nbsp; **[FAQ](#-faq)**
 
 </div>
 
 ---
-
-## 🚀 Quick Start
-
-Open your terminal and start typing a command:
-
-```
-$ git che【cursor here, gray hint: ckout main】
-```
-
-If ShellClaw is installed, the gray completion appears right of the cursor. Press **Tab** or **→** to accept, or just keep typing to ignore it.
-
-```bash
-# 1. Install (see Install section below)
-# 2. Start the daemon
-shellclaw start
-
-# 3. Check status
-shellclaw status
-# → shellclaw: running
-
-# 4. Open a new terminal and start using it!
-```
-
-> Command memory is accumulated automatically as you run commands — the more
-> you use ShellClaw, the better it learns your habits.
-
----
-
-## ✨ Features
-
-| Capability | Description |
-|------|------|
-| **Local LLM completion** | A local language model (via llama.cpp) generates the completion, not a fixed rule — it understands shell commands and infers the next words |
-| **Memory-augmented** | Your SQLite command memory ranks suggestions by what *you* actually run, keeping the LLM fast and relevant — frequency, recency, cwd |
-| **Ghost text UX** | A gray single-line hint right after the cursor, never disrupting your typing |
-| **Accept keys** | `Tab` or `→` accepts instantly; keep typing to replace or clear seamlessly |
-| **Non-blocking** | Completions run asynchronously — even if the daemon hangs, your shell input is unaffected |
-| **Silent degradation** | When the daemon is missing, slow, or errors, the shell falls back to native behavior — zero errors, zero interruption |
-| **Privacy** | LLM + memory run 100% on-device; nothing ever leaves your machine |
-| **Zsh / Bash** | Out-of-the-box support for both major shells |
-
----
-
-## 🏗️ Architecture
-
-```
-Keystrokes → Shell Hook (zle) → Unix Socket → Rust Daemon
-                                              ↓
-                  SQLite command memory (FTS5) — re-ranking + personal priors
-                                              ↓
-                   Local LLM (llama.cpp) — the completion brain
-                                              ↓
-                        Return completion suffix → Hook renders Ghost Text
-```
-
-Three layers with clear separation of concerns:
-
-- **Shell Hook**: listens to keys, debounces, sends requests, renders gray completions — never touches main shell input
-- **Rust Daemon**: resident background process, drives the local LLM + memory, talks to the hook over a Unix socket
-- **Local LLM + Memory**: llama.cpp inference + SQLite memory, all on-device
-
-**Data flow (one completion)**:
-
-```
-You type "git che" in the terminal
-   ↓ pause briefly (debounce)
-Hook sends JSON-RPC completion.request
-   ↓
-Daemon retrieves relevant commands from memory (fast, personalized)
-   ↓
-Local LLM generates the completion, guided by those memory candidates
-   ↓
-Return suffix "ckout main" → Hook renders gray "ckout main" right of cursor
-  press Tab/→ to accept, or keep typing to clear
-```
-  press Tab/→ to accept, or keep typing to clear
-```
-
----
-
-## 🛠️ CLI
-
-`shellclaw` is a single self-contained binary with subcommands:
-
-```bash
-shellclaw daemon          Run daemon in the foreground (for service managers)
-shellclaw start           Start the daemon in the background
-shellclaw stop            Stop the daemon
-shellclaw status          Show running status
-shellclaw log on|off      Enable/disable file logging (persisted)
-shellclaw help            Show help
-```
-
-```bash
-# Logging is off by default (clean). Enable it for diagnostics:
-shellclaw log on
-shellclaw start
-# → starts logging to ~/.shellclaw/daemon.log
-
-# Keep it off in daily use
-shellclaw log off
-```
-
----
-
 ## 📦 Install
 
 ### Homebrew (recommended)
 
 ```bash
-brew tap Edwardd02/homebrew-shellclaw
+brew tap --trusted Edwardd02/homebrew-shellclaw
 brew install shellclaw
 ```
 
@@ -158,6 +53,8 @@ git clone https://github.com/Edwardd02/Shell-Claw.git
 cd Shell-Claw
 cargo build --release
 ```
+
+---
 
 ---
 
@@ -224,11 +121,131 @@ rm -rf ~/.shellclaw    # remove all data & model (zero residue)
 
 ---
 
+---
+
+## 🚀 Quick Start
+
+Install, start, and you're completing commands in under a minute.
+
+```bash
+# 1. Install (see Install below for details)
+brew tap --trusted Edwardd02/homebrew-shellclaw
+brew install shellclaw
+
+# 2. Start the daemon
+shellclaw start
+
+# 3. Verify it's running
+shellclaw status
+# → shellclaw: running
+
+# 4. Open a NEW terminal and start typing
+```
+
+Open a new terminal and type a command:
+
+```
+$ git che【cursor here, gray hint: ckout main】
+```
+
+The gray completion appears right of the cursor. Press **Tab** or **→** to
+accept, or just keep typing to ignore it.
+
+> Command memory is accumulated automatically as you run commands — the more
+> you use ShellClaw, the better it learns your habits.
+
+---
+
+---
+
+## ✨ Features
+
+| Capability | Description |
+|------|------|
+| **Local LLM completion** | A local language model (via llama.cpp) generates the completion, not a fixed rule — it understands shell commands and infers the next words |
+| **Memory-augmented** | Your SQLite command memory ranks suggestions by what *you* actually run, keeping the LLM fast and relevant — frequency, recency, cwd |
+| **Ghost text UX** | A gray single-line hint right after the cursor, never disrupting your typing |
+| **Accept keys** | `Tab` or `→` accepts instantly; keep typing to replace or clear seamlessly |
+| **Non-blocking** | Completions run asynchronously — even if the daemon hangs, your shell input is unaffected |
+| **Silent degradation** | When the daemon is missing, slow, or errors, the shell falls back to native behavior — zero errors, zero interruption |
+| **Privacy** | LLM + memory run 100% on-device; nothing ever leaves your machine |
+| **Zsh / Bash** | Out-of-the-box support for both major shells |
+
+---
+
+---
+
+## 🏗️ Architecture
+
+```
+Keystrokes → Shell Hook (zle) → Unix Socket → Rust Daemon
+                                              ↓
+                  SQLite command memory (FTS5) — re-ranking + personal priors
+                                              ↓
+                   Local LLM (llama.cpp) — the completion brain
+                                              ↓
+                        Return completion suffix → Hook renders Ghost Text
+```
+
+Three layers with clear separation of concerns:
+
+- **Shell Hook**: listens to keys, debounces, sends requests, renders gray completions — never touches main shell input
+- **Rust Daemon**: resident background process, drives the local LLM + memory, talks to the hook over a Unix socket
+- **Local LLM + Memory**: llama.cpp inference + SQLite memory, all on-device
+
+**Data flow (one completion)**:
+
+```
+You type "git che" in the terminal
+   ↓ pause briefly (debounce)
+Hook sends JSON-RPC completion.request
+   ↓
+Daemon retrieves relevant commands from memory (fast, personalized)
+   ↓
+Local LLM generates the completion, guided by those memory candidates
+   ↓
+Return suffix "ckout main" → Hook renders gray "ckout main" right of cursor
+  press Tab/→ to accept, or keep typing to clear
+```
+
+---
+
+---
+
+## 🛠️ CLI
+
+`shellclaw` is a single self-contained binary with subcommands:
+
+```bash
+shellclaw daemon          Run daemon in the foreground (for service managers)
+shellclaw start           Start the daemon in the background
+shellclaw stop            Stop the daemon
+shellclaw status          Show running status
+shellclaw log on|off      Enable/disable file logging (persisted)
+shellclaw help            Show help
+```
+
+```bash
+# Logging is off by default (clean). Enable it for diagnostics:
+shellclaw log on
+shellclaw start
+# → starts logging to ~/.shellclaw/daemon.log
+
+# Keep it off in daily use
+shellclaw log off
+```
+
+---
+
+---
+
 ## 🔒 Privacy & Data Safety
 
 - **100% local**: command memory (SQLite) and model inference all happen on your machine; nothing is ever sent out
 - **No telemetry**: we do not collect any usage data
 - **Fully removable**: delete `~/.shellclaw/` to clear all data and config (zero residue)
+
+---
 
 ---
 
@@ -253,6 +270,8 @@ zsh-autosuggestions mechanically echoes words from your shell history. **ShellCl
 
 ---
 
+---
+
 ## 📄 License
 
 [MIT License](LICENSE) © 2026 Edwardd02
@@ -262,3 +281,4 @@ zsh-autosuggestions mechanically echoes words from your shell history. **ShellCl
 Thanks for checking out ShellClaw! If it makes your terminal nicer to use, a star is the best support.
 
 **[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[Report an issue](https://github.com/Edwardd02/Shell-Claw/issues)**
+
