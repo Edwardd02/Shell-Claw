@@ -5,7 +5,7 @@ class Shellclaw < Formula
 
   if OS.mac? && Hardware::CPU.arm?
     url "https://github.com/Edwardd02/Shell-Claw/releases/download/v0.0.1/shellclaw-aarch64-apple-darwin.tar.gz"
-    sha256 "16a701ebc0ad778e3ca267db6d77b33778a4390ad02c7dfc0d5fb7b1d4eff225"
+    sha256 "8f7c5f03c95297bb5898e847eed90e059c07dddebf4d36fdc07b4d6036d6e74f"
   else
     odie "ShellClaw v0.0.1 currently supports Apple Silicon only"
   end

@@ -46,11 +46,22 @@ pub fn config_path() -> PathBuf {
     data_dir().join("config")
 }
 
+/// 默认模型路径: `~/.shellclaw/models/qwen2.5-coder-0.5b-instruct-finetuned.gguf`
+///
+/// 模型由 brew post_install / download-model.sh 下载到这里,daemon 无需
+/// 用户手动设置 SHELLCLAW_MODEL_PATH 就能加载。
+pub fn default_model_path() -> PathBuf {
+    let filename = "qwen2.5-coder-0.5b-instruct-finetuned.gguf";
+    std::env::var("SHELLCLAW_MODEL_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| data_dir().join("models").join(filename))
+}
+
 impl Default for DaemonConfig {
     fn default() -> Self {
         Self {
             socket_path: PathBuf::from("/tmp/shellclaw.sock"),
-            model_path: PathBuf::from("models/qwen2.5-coder-0.5b-instruct-finetuned.gguf"),
+            model_path: default_model_path(),
             db_path: data_dir().join("memory.db"),
             log_path: data_dir().join("daemon.log"),
             log_enabled: false,
@@ -75,9 +86,7 @@ impl DaemonConfig {
 
         let model_path = std::env::var("SHELLCLAW_MODEL_PATH")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| {
-                PathBuf::from("models/qwen2.5-coder-0.5b-instruct-finetuned.gguf")
-            });
+            .unwrap_or_else(|_| default_model_path());
 
         let db_path = base.join("memory.db");
         let log_path = base.join("daemon.log");
