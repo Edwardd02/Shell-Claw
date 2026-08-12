@@ -139,6 +139,17 @@ brew tap Edwardd02/homebrew-shellclaw
 brew install shellclaw
 ```
 
+`brew install` will:
+1. Install the `shellclaw` binary
+2. Automatically download the model into `~/.shellclaw/models/` by probing
+   **Hugging Face and ModelScope**, picking the faster source, and falling back
+   to the other if one fails
+
+If the model download is interrupted, just re-run `brew postinstall shellclaw`.
+
+> **Requirements**: macOS Apple Silicon (ARM). Linux and Intel macOS are
+> in development.
+
 ### Build from source
 
 ```bash
@@ -148,14 +159,67 @@ cd Shell-Claw
 cargo build --release
 ```
 
+---
+
+## 🚗 Usage
+
+Once installed, ShellClaw runs in the background as a daemon. Start it, and
+open a **new terminal** to get completions.
+
+```bash
+# Start the daemon (background)
+shellclaw start
+
+# Check status
+shellclaw status
+# → shellclaw: running
+```
+
+Then type a command in your shell:
+
+```
+$ git che【cursor here, gray hint: ckout main】
+```
+
+Press **Tab** or **→** to accept, or keep typing to ignore.
+
+### Common commands
+
+```bash
+shellclaw start           # start the daemon in the background
+shellclaw stop            # stop the daemon
+shellclaw status          # check whether the daemon is running
+shellclaw log on|off      # enable / disable file logging (persisted)
+shellclaw help            # list all commands
+```
+
+### Automatic loading
+
+The shell hook loads automatically when you open a new terminal after
+installation — no manual `.zshrc` edits required. If you ever need to load it
+manually in the current shell:
+
+```bash
+source /path/to/shellclaw.zsh     # Zsh
+# or
+source /path/to/shellclaw.bash    # Bash
+```
+
 ### Configuration
 
 ```bash
 # ShellClaw data directory (default ~/.shellclaw)
 export SHELLCLAW_DATA_DIR=~/your/custom/dir
 
-# Model path (if using a local model)
+# Model path (if you downloaded a model elsewhere)
 export SHELLCLAW_MODEL_PATH=/path/to/your/model.gguf
+```
+
+### Uninstall
+
+```bash
+brew uninstall shellclaw
+rm -rf ~/.shellclaw    # remove all data & model (zero residue)
 ```
 
 ---

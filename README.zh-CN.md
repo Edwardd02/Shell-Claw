@@ -135,6 +135,15 @@ brew tap Edwardd02/homebrew-shellclaw
 brew install shellclaw
 ```
 
+`brew install` 会:
+1. 安装 `shellclaw` 二进制
+2. 自动下载模型到 `~/.shellclaw/models/` —— 同时探测 **Hugging Face 和 ModelScope**,
+   选择较快的源;若其中一个失败会自动切换到另一个
+
+若模型下载被打断,重跑 `brew postinstall shellclaw` 即可续传。
+
+> **要求**: macOS Apple Silicon(ARM)。Linux 和 Intel macOS 开发中。
+
 ### 方式二:从源码构建
 
 ```bash
@@ -144,14 +153,65 @@ cd Shell-Claw
 cargo build --release
 ```
 
+---
+
+## 🚗 使用
+
+安装后 ShellClaw 以守护进程方式在后台运行。启动它,然后**新开一个终端**即可获得补全。
+
+```bash
+# 启动守护进程(后台)
+shellclaw start
+
+# 查看状态
+shellclaw status
+# → shellclaw: running
+```
+
+然后在 shell 里输入命令:
+
+```
+$ git che【光标在此,灰色提示 ckout main】
+```
+
+按 **Tab** 或 **→** 接受,或继续打字忽略。
+
+### 常用命令
+
+```bash
+shellclaw start           # 后台启动守护进程
+shellclaw stop            # 停止守护进程
+shellclaw status          # 查看是否在运行
+shellclaw log on|off      # 开启/关闭文件日志(持久化)
+shellclaw help            # 列出所有命令
+```
+
+### 自动加载
+
+安装后,**新开终端即自动加载 shell 钩子**,无需手动编辑 `.zshrc`。如需在当前
+shell 手动加载:
+
+```bash
+source /path/to/shellclaw.zsh     # Zsh
+# 或
+source /path/to/shellclaw.bash    # Bash
+```
+
 ### 配置
 
 ```bash
 # ShellClaw 数据目录(默认 ~/.shellclaw)
 export SHELLCLAW_DATA_DIR=~/your/custom/dir
 
-# 模型路径(如使用本地模型)
+# 模型路径(如模型下到了别处)
 export SHELLCLAW_MODEL_PATH=/path/to/your/model.gguf
+```
+
+### 卸载
+
+```bash
+brew uninstall shellclaw
+rm -rf ~/.shellclaw    # 清空全部数据和模型(零残留)
 ```
 
 ---

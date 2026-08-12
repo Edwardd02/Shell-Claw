@@ -135,6 +135,15 @@ brew tap Edwardd02/homebrew-shellclaw
 brew install shellclaw
 ```
 
+`brew install` は:
+1. `shellclaw` バイナリをインストール
+2. モデルを自動で `~/.shellclaw/models/` にダウンロード —— **Hugging Face と
+   ModelScope** の両方を測速し、速い方を選択。片方が失敗しても他方に自動フェールバック
+
+ダウンロードが中断されたら、`brew postinstall shellclaw` を再実行すれば再開します。
+
+> **要件**: macOS Apple Silicon（ARM）。Linux / Intel macOS は開発中。
+
 ### ソースからビルド
 
 ```bash
@@ -144,14 +153,66 @@ cd Shell-Claw
 cargo build --release
 ```
 
+---
+
+## 🚗 使い方
+
+インストール後、ShellClaw はバックグラウンドのデーモンとして動作します。起動して、
+**新しいターミナル**を開けば補完が使えます。
+
+```bash
+# デーモンを起動（バックグラウンド）
+shellclaw start
+
+# 状態を確認
+shellclaw status
+# → shellclaw: running
+```
+
+シェルにコマンドを入力してください：
+
+```
+$ git che【カーソル位置、灰色のヒント: ckout main】
+```
+
+**Tab** または **→** で確定、打ち続けて無視します。
+
+### 主なコマンド
+
+```bash
+shellclaw start           # デーモンをバックグラウンド起動
+shellclaw stop            # デーモンを停止
+shellclaw status          # 起動状態を確認
+shellclaw log on|off      # ファイルログ有効/無効（永続化）
+shellclaw help            # 全コマンドを表示
+```
+
+### 自動ロード
+
+インストール後、**新しいターミナルで自動的にシェルフックが読み込まれ**、
+手動で `.zshrc` を編集する必要はありません。現在のシェルに手動で読み込む場合:
+
+```bash
+source /path/to/shellclaw.zsh     # Zsh
+# または
+source /path/to/shellclaw.bash    # Bash
+```
+
 ### 設定
 
 ```bash
 # ShellClaw データディレクトリ（デフォルト ~/.shellclaw）
 export SHELLCLAW_DATA_DIR=~/your/custom/dir
 
-# モデルパス（ローカルモデルを使う場合）
+# モデルパス（別の場所にモデルを置いた場合）
 export SHELLCLAW_MODEL_PATH=/path/to/your/model.gguf
+```
+
+### アンインストール
+
+```bash
+brew uninstall shellclaw
+rm -rf ~/.shellclaw    # 全データ・モデルを削除（残骸ゼロ）
 ```
 
 ---
