@@ -30,8 +30,7 @@
 
 ```bash
 brew tap edwardd02/shellclaw
-brew trust edwardd02/shellclaw   # 一度信頼する。信頼されていない tap の公式は brew が拒否するため
-brew install shellclaw
+brew trust edwardd02/shellclaw && brew install shellclaw
 ```
 
 > Homebrew はデフォルトで信頼されていない tap の formula を実行しません。

@@ -31,8 +31,7 @@
 
 ```bash
 brew tap edwardd02/shellclaw
-brew trust edwardd02/shellclaw   # trust it once so brew can run its install hooks
-brew install shellclaw
+brew trust edwardd02/shellclaw && brew install shellclaw
 ```
 
 > Homebrew refuses to run formulas from untrusted taps by default. The single
@@ -137,8 +136,7 @@ Install, start, and you're completing commands in under a minute.
 ```bash
 # 1. Install (see Install below for details)
 brew tap edwardd02/shellclaw
-brew trust edwardd02/shellclaw
-brew install shellclaw
+brew trust edwardd02/shellclaw && brew install shellclaw
 
 # 2. Start the daemon
 shellclaw start

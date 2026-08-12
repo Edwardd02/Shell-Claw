@@ -30,8 +30,7 @@
 
 ```bash
 brew tap edwardd02/shellclaw
-brew trust edwardd02/shellclaw   # 首次信任,否则 brew 拒绝运行第三方公式
-brew install shellclaw
+brew trust edwardd02/shellclaw && brew install shellclaw
 ```
 
 > Homebrew 默认拒绝执行未受信任 tap 的公式。上面的 `brew trust` 一次即可
