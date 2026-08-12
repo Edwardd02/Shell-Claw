@@ -25,16 +25,11 @@ impl RequestValidator {
             return Err(CompletionResult::no_suggestion());
         }
 
-        if params.line.contains('\0') || params.line.contains('\r') || params.line.contains('\n')
-        {
+        if params.line.contains('\0') || params.line.contains('\r') || params.line.contains('\n') {
             return Err(CompletionResult::no_suggestion());
         }
 
         Ok(())
-    }
-
-    pub fn max_line_length() -> usize {
-        crate::config::DaemonConfig::load().max_line_length
     }
 }
 
@@ -94,4 +89,3 @@ mod tests {
         assert!(RequestValidator::validate(&p).is_err());
     }
 }
-

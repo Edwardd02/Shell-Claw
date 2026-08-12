@@ -1,7 +1,7 @@
 use protocol::{CancelRequest, CompletionRequest, JsonRpcMessage, MemoryRecordRequest};
 use tracing::{debug, info, warn};
 
-pub async fn dispatch(raw: &str) -> Option<String> {
+pub async fn dispatch(raw: &str, arrival_sequence: u64) -> Option<String> {
     debug!("RECV(daemon) >>> {}", raw);
 
     let msg: JsonRpcMessage = match serde_json::from_str(raw) {
@@ -13,8 +13,13 @@ pub async fn dispatch(raw: &str) -> Option<String> {
         }
     };
 
+    if !msg.has_valid_envelope() {
+        warn!("Rejected invalid JSON-RPC envelope");
+        return None;
+    }
+
     let resp = match msg {
-        JsonRpcMessage::Request(req) => handle_completion(req).await,
+        JsonRpcMessage::Request(req) => handle_completion(req, arrival_sequence).await,
         JsonRpcMessage::Cancel(req) => handle_cancel(req).await,
         JsonRpcMessage::Record(req) => handle_record(req).await,
     };
@@ -25,9 +30,9 @@ pub async fn dispatch(raw: &str) -> Option<String> {
     resp
 }
 
-async fn handle_completion(req: CompletionRequest) -> Option<String> {
+async fn handle_completion(req: CompletionRequest, arrival_sequence: u64) -> Option<String> {
     let scheduler = crate::scheduler::global();
-    let result = scheduler.submit_completion(req).await;
+    let result = scheduler.submit_completion(req, arrival_sequence).await;
 
     let response = protocol::CompletionResponse {
         jsonrpc: "2.0".to_string(),
@@ -45,9 +50,7 @@ async fn handle_cancel(req: CancelRequest) -> Option<String> {
     let response = protocol::CancelResponse {
         jsonrpc: "2.0".to_string(),
         id: req.id,
-        result: protocol::CancelResult {
-            cancelled: result,
-        },
+        result: protocol::CancelResult { cancelled: result },
     };
 
     serde_json::to_string(&response).ok()
@@ -55,14 +58,13 @@ async fn handle_cancel(req: CancelRequest) -> Option<String> {
 
 async fn handle_record(req: MemoryRecordRequest) -> Option<String> {
     let scheduler = crate::scheduler::global();
-    scheduler
-        .record_command(&req.params.cwd, &req.params.command)
-        .await;
+    scheduler.record_command(&req.params.cwd, &req.params.command).await;
 
-    Some(
-        format!(
-            r#"{{"jsonrpc":"2.0","id":"{}","result":{{"recorded":true}}}}"#,
-            req.id
-        ),
-    )
+    let response = protocol::MemoryRecordResponse {
+        jsonrpc: protocol::JSONRPC_VERSION.to_string(),
+        id: req.id,
+        result: protocol::MemoryRecordResult { recorded: true },
+    };
+
+    serde_json::to_string(&response).ok()
 }

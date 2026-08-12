@@ -6,7 +6,7 @@
 
 ### 本地大语言模型 + 命令行 Ghost Text 补全，像 GitHub Copilot 一样、但完全在本地运行
 
-> 一个本地 LLM + Rust 守护进程 + Shell 钩子，边输入边补全你的 Zsh / Bash 命令。
+> 一个本地 LLM + Rust 守护进程 + Shell 钩子，边输入边补全你的 Zsh 命令。
 > 轻量 SQLite 命令记忆学习你的习惯、实现秒级召回；本地语言模型（llama.cpp）
 > 在历史之外还能智能联想。数据不出机器。
 
@@ -43,6 +43,7 @@ brew trust edwardd02/shellclaw && brew install shellclaw
 1. 安装 `shellclaw` 二进制
 2. 自动下载模型到 `~/.shellclaw/models/` —— 同时探测 **Hugging Face 和 ModelScope**,
    选择较快的源;若其中一个失败会自动切换到另一个
+3. 幂等写入 `~/.zshrc` 的 ShellClaw 标记块，并启动 daemon
 
 若模型下载被打断,重跑 `brew postinstall shellclaw` 即可续传。
 
@@ -63,12 +64,9 @@ cargo build --release
 
 ## 🚗 使用
 
-安装后 ShellClaw 以守护进程方式在后台运行。启动它,然后**新开一个终端**即可获得补全。
+安装后 Homebrew 会启动 daemon 并配置 Zsh hook。**新开一个 Zsh 终端**即可获得补全。
 
 ```bash
-# 启动守护进程(后台)
-shellclaw start
-
 # 查看状态
 shellclaw status
 # → shellclaw: running
@@ -100,7 +98,7 @@ shell 手动加载:
 ```bash
 source /path/to/shellclaw.zsh     # Zsh
 # 或
-source /path/to/shellclaw.bash    # Bash
+source /path/to/shellclaw.bash    # Bash（实验性）
 ```
 
 ### 配置
@@ -136,14 +134,11 @@ $ git che【光标在此，灰色提示 ckout main】
 
 ```bash
 # 1. 安装(见下方安装章节)
-# 2. 启动 daemon
-shellclaw start
-
-# 3. 状态确认
+# 2. 状态确认
 shellclaw status
 # → shellclaw: running
 
-# 4. 开一个新的终端,开始使用!
+# 3. 开一个新的 Zsh 终端,开始使用!
 ```
 
 > 命令记忆会在你执行命令时自动积累——越用，补全越懂你的习惯。
@@ -163,7 +158,7 @@ shellclaw status
 | **非阻塞** | 补全请求异步进行,即便 daemon 卡死,shell 输入也完全不受影响 |
 | **静默降级** | daemon 缺失/超时/异常时,shell 自动回退原生行为,零报错、零打断 |
 | **隐私安全** | LLM + 记忆 100% 本地运行,数据绝不出机器 |
-| **Zsh / Bash** | 两大主流 shell 原生支持 |
+| **Shell 支持** | Zsh 完整支持并自动配置；Bash 为实验性手动支持 |
 
 ---
 
@@ -181,11 +176,12 @@ shellclaw status
                             返回补全后缀 → Hook 渲染 Ghost Text
 ```
 
-三层关注点分离:
+四层显式解耦:
 
 - **Shell Hook**: 监听按键、去抖、发请求、渲染灰色补全,绝不影响 shell 主输入
-- **Rust Daemon**: 常驻后台,驱动本地 LLM + 记忆,通过 Unix Socket 与 hook 通信
-- **本地 LLM + 记忆**: llama.cpp 推理 + SQLite 记忆,全部本地
+- **Rust Daemon / scheduler**: 负责 JSON-RPC、deadline、取消和 worker 调度
+- **SQLite 记忆**: 通过 `MemoryStore` Trait 提供 FTS5 快路径
+- **本地模型**: 通过 `CompletionModel` Trait 提供 llama.cpp fallback
 
 **数据流(单次补全)**:
 
@@ -196,7 +192,7 @@ Hook 发送 JSON-RPC completion.request
    ↓
 Daemon 从记忆检索相关命令(快速、个性化)
    ↓
-本地 LLM 以这些记忆候选为依据,生成补全
+记忆没有有效后缀时，本地 LLM 生成 fallback
    ↓
 返回后缀 "ckout main" → Hook 在光标右侧渲染灰色 "ckout main"
   按 Tab/→ 接受, 或继续打字 清除
@@ -216,6 +212,8 @@ shellclaw start           后台启动 daemon
 shellclaw stop            停止 daemon
 shellclaw status          查看运行状态
 shellclaw log on|off      开启/关闭文件日志(持久化)
+shellclaw setup PATH      幂等配置 Zsh hook
+shellclaw --version       显示安装版本
 shellclaw help            帮助
 ```
 
@@ -237,6 +235,8 @@ shellclaw log off
 
 - **纯本地**: 命令记忆(SQLite) 和 模型推理全部在机器内完成,数据绝不外传
 - **无遥测**: 不收集任何使用数据
+- **默认隐私**: 交互日志和 daemon 文件日志默认关闭，只有显式开启才记录
+- **低空闲占用**: 模型运行时空闲 30 秒后卸载，轻量 daemon 保持可用
 - **可卸载**: 删除 `~/.shellclaw/` 即可清空全部数据和配置(零残留)
 
 ---
@@ -275,4 +275,3 @@ zsh-autosuggestions 机械地从 shell 历史里回显单词。**ShellClaw 用�
 欢迎使用 ShellClaw!如果它让终端用起来更顺手,给个 ⭐ 就是最好的支持。
 
 **[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[报告问题](https://github.com/Edwardd02/Shell-Claw/issues)**
-

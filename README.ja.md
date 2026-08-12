@@ -6,7 +6,7 @@
 
 ### ローカル言語モデル + GitHub Copilot ライクな Ghost Text 補完。完全オンデバイスで動作
 
-> ローカル LLM + Rust デーモン + シェルフックで、Zsh / Bash のコマンド入力を補完。
+> ローカル LLM + Rust デーモン + シェルフックで、Zsh のコマンド入力を補完。
 > 軽量 SQLite のコマンド記憶があなたの習慣を学習して瞬間応答を実現。
 > ローカル言語モデル（llama.cpp）が履歴を超えてスマートに推論。データは外に出ません。
 
@@ -44,6 +44,7 @@ brew trust edwardd02/shellclaw && brew install shellclaw
 1. `shellclaw` バイナリをインストール
 2. モデルを自動で `~/.shellclaw/models/` にダウンロード —— **Hugging Face と
    ModelScope** の両方を測速し、速い方を選択。片方が失敗しても他方に自動フェールバック
+3. `~/.zshrc` に冪等な ShellClaw ブロックを追加し、デーモンを起動
 
 ダウンロードが中断されたら、`brew postinstall shellclaw` を再実行すれば再開します。
 
@@ -64,13 +65,10 @@ cargo build --release
 
 ## 🚗 使い方
 
-インストール後、ShellClaw はバックグラウンドのデーモンとして動作します。起動して、
-**新しいターミナル**を開けば補完が使えます。
+Homebrew はデーモンを起動し、Zsh フックを自動設定します。
+**新しい Zsh ターミナル**を開けば補完が使えます。
 
 ```bash
-# デーモンを起動（バックグラウンド）
-shellclaw start
-
 # 状態を確認
 shellclaw status
 # → shellclaw: running
@@ -102,7 +100,7 @@ shellclaw help            # 全コマンドを表示
 ```bash
 source /path/to/shellclaw.zsh     # Zsh
 # または
-source /path/to/shellclaw.bash    # Bash
+source /path/to/shellclaw.bash    # Bash（実験的）
 ```
 
 ### 設定
@@ -138,14 +136,11 @@ ShellClaw がインストールされていれば、カーソルの右に灰色�
 
 ```bash
 # 1. インストール（下記インストール節を参照）
-# 2. デーモンを起動
-shellclaw start
-
-# 3. 状態を確認
+# 2. 状態を確認
 shellclaw status
 # → shellclaw: running
 
-# 4. 新しいターミナルを開いて使い始めましょう！
+# 3. 新しい Zsh ターミナルを開いて使い始めましょう！
 ```
 
 > コマンドを実行するたびに記憶が自動で蓄積されます。使うほど補完があなたの習慣を理解します。
@@ -165,7 +160,7 @@ shellclaw status
 | **非ブロッキング** | 補完は非同期実行。デーモンが固まってもシェル入力は影響を受けません |
 | **サイレントダウングレード** | デーモンが不在・遅延・異常時もシェルはネイティブ動作に自動フォールバック。エラー・中断は一切なし |
 | **プライバシー** | LLM + 記憶は 100% オンデバイス。データがマシンを出ることはありません |
-| **Zsh / Bash** | 両メジャーシェルを標準サポート |
+| **シェル対応** | Zsh は完全対応・自動設定。Bash は実験的な手動対応 |
 
 ---
 
@@ -183,11 +178,12 @@ shellclaw status
                             補完サフィックスを返す → Hook がゴーストテキストを描画
 ```
 
-関心の分離が明確な3層構造:
+明示的に分離された4層構造:
 
 - **Shell Hook**: キー監視・デバウンス・リクエスト送信・灰色補完の描画。シェルの主入力には一切触れません
-- **Rust Daemon**: 常駐バックグラウンドプロセス。ローカル LLM と記憶を駆動し、Unix Socket 経由でフックと通信
-- **ローカル LLM + 記憶**: llama.cpp 推論 + SQLite 記憶。すべてローカル
+- **Rust Daemon / scheduler**: JSON-RPC、deadline、キャンセル、worker dispatch を担当
+- **SQLite 記憶**: `MemoryStore` Trait の背後にある FTS5 高速パス
+- **ローカルモデル**: `CompletionModel` Trait の背後にある llama.cpp fallback
 
 **データフロー（1回の補完）**:
 
@@ -198,7 +194,7 @@ Hook が JSON-RPC completion.request を送信
    ↓
 Daemon が記憶から関連コマンドを取得（高速・個人化）
    ↓
-ローカル LLM がその記憶候補に基づいて補完を生成
+記憶に有効な suffix がなければローカル LLM が fallback を生成
    ↓
 サフィックス "ckout main" を返す → Hook がカーソル右に灰色 "ckout main" を描画
   Tab/→ で確定、または打ち続けてクリア
@@ -218,6 +214,8 @@ shellclaw start           デーモンをバックグラウンドで起動
 shellclaw stop            デーモンを停止
 shellclaw status          実行状態を表示
 shellclaw log on|off      ファイルログを有効/無効化（永続化）
+shellclaw setup PATH      Zsh フックを冪等に設定
+shellclaw --version       インストール済みバージョンを表示
 shellclaw help            ヘルプを表示
 ```
 
@@ -239,6 +237,8 @@ shellclaw log off
 
 - **完全ローカル**: コマンド記憶（SQLite）とモデル推論はすべてマシン内で完結。外部送信は一切なし
 - **テレメトリなし**: 使用データは収集しません
+- **デフォルトで非記録**: 対話ログとデーモンファイルログは明示的に有効化しない限り無効
+- **低いアイドル負荷**: 30 秒のアイドル後にモデルをアンロードし、軽量デーモンだけを維持
 - **完全削除可能**: `~/.shellclaw/` を削除すれば全データと設定がクリアされます（残骸ゼロ）
 
 ---
@@ -277,4 +277,3 @@ zsh-autosuggestions はシェル履歴から機械的に単語をリピートし
 ShellClaw をありがとうございます。ターミナルが使いやすくなったら、スターが最高の応援になります。
 
 **[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[Issue を報告](https://github.com/Edwardd02/Shell-Claw/issues)**
-

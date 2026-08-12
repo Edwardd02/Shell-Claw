@@ -16,10 +16,24 @@ CREATE VIRTUAL TABLE IF NOT EXISTS command_fts USING fts5(
 );
 ";
 
+pub const CREATE_COMMAND_LOOKUP_INDEX: &str = "
+CREATE INDEX IF NOT EXISTS command_history_cwd_command_idx
+ON command_history(cwd, command);
+";
+
 pub const INSERT_COMMAND: &str = "
 INSERT INTO command_history (cwd, command, last_used_at, use_count)
-VALUES (?1, ?2, ?3, 1)
-ON CONFLICT(id) DO UPDATE SET use_count = use_count + 1, last_used_at = ?3;
+VALUES (?1, ?2, ?3, 1);
+";
+
+pub const FIND_COMMAND: &str = "
+SELECT id FROM command_history WHERE cwd = ?1 AND command = ?2 LIMIT 1;
+";
+
+pub const UPDATE_COMMAND: &str = "
+UPDATE command_history
+SET use_count = use_count + 1, last_used_at = ?2
+WHERE id = ?1;
 ";
 
 pub const INSERT_FTS: &str = "

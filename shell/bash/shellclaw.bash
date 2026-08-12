@@ -3,7 +3,7 @@
 # Non-blocking Ghost Text completion integration.
 # Silently no-ops if the daemon socket is unavailable.
 
-SSC_SOCKET="${SSC_SOCKET:-/tmp/shellclaw.sock}"
+SSC_SOCKET="${SSC_SOCKET:-${SHELLCLAW_DATA_DIR:-$HOME/.shellclaw}/daemon.sock}"
 SSC_DEADLINE_MS="${SSC_DEADLINE_MS:-25}"
 
 _ssc_session_id="ssc-$$"

@@ -8,34 +8,11 @@ pub struct DaemonConfig {
     pub log_path: PathBuf,
     pub log_enabled: bool,
     pub max_line_length: usize,
-    pub default_deadline_ms: u64,
-    pub ranking_weights: RankingWeights,
-}
-
-#[derive(Debug, Clone)]
-pub struct RankingWeights {
-    pub bm25: f64,
-    pub cwd: f64,
-    pub frequency: f64,
-    pub recency_lambda: f64,
-}
-
-impl Default for RankingWeights {
-    fn default() -> Self {
-        Self {
-            bm25: 0.40,
-            cwd: 0.25,
-            frequency: 0.20,
-            recency_lambda: 0.15,
-        }
-    }
 }
 
 /// ShellClaw 用户数据目录: `~/.shellclaw/`
 pub fn data_dir() -> PathBuf {
-    let home = std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"));
+    let home = std::env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/tmp"));
     std::env::var("SHELLCLAW_DATA_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| home.join(".shellclaw"))
@@ -60,14 +37,12 @@ pub fn default_model_path() -> PathBuf {
 impl Default for DaemonConfig {
     fn default() -> Self {
         Self {
-            socket_path: PathBuf::from("/tmp/shellclaw.sock"),
+            socket_path: data_dir().join("daemon.sock"),
             model_path: default_model_path(),
             db_path: data_dir().join("memory.db"),
             log_path: data_dir().join("daemon.log"),
             log_enabled: false,
             max_line_length: 4096,
-            default_deadline_ms: 25,
-            ranking_weights: RankingWeights::default(),
         }
     }
 }
@@ -82,7 +57,7 @@ impl DaemonConfig {
 
         let socket_path = std::env::var("SHELLCLAW_SOCKET_PATH")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/tmp/shellclaw.sock"));
+            .unwrap_or_else(|_| base.join("daemon.sock"));
 
         let model_path = std::env::var("SHELLCLAW_MODEL_PATH")
             .map(PathBuf::from)
@@ -101,11 +76,6 @@ impl DaemonConfig {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(4096),
-            default_deadline_ms: std::env::var("SHELLCLAW_DEADLINE_MS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(25),
-            ranking_weights: RankingWeights::default(),
         }
     }
 }

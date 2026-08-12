@@ -1,16 +1,18 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::{num::NonZeroU32, time::Instant};
 use tokio_util::sync::CancellationToken;
 
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
-use llama_cpp_2::model::{AddBos, LlamaChatMessage, LlamaModel, Special};
+use llama_cpp_2::model::params::LlamaModelParams;
+use llama_cpp_2::model::{AddBos, LlamaChatMessage, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
 use llama_cpp_2::token::LlamaToken;
 
-use super::{CompletionModel, ModelContext, ModelError, ModelOutput, ModelResult};
 use super::grammar::validate_grammar_output;
+use super::{CompletionModel, ModelContext, ModelError, ModelOutput, ModelResult};
 
 struct Engine {
     backend: LlamaBackend,
@@ -24,43 +26,43 @@ struct Engine {
 /// here and a fresh context is created per request and dropped at the end.
 pub struct LlamaCppAdapter {
     model_path: PathBuf,
-    engine: Mutex<Option<Engine>>,
+    state: Mutex<EngineState>,
+}
+
+struct EngineState {
+    engine: Option<Engine>,
+    last_used: Instant,
 }
 
 impl LlamaCppAdapter {
     pub fn new(model_path: PathBuf) -> Self {
         Self {
             model_path,
-            engine: Mutex::new(None),
+            state: Mutex::new(EngineState { engine: None, last_used: Instant::now() }),
         }
     }
 
     fn with_engine<T>(&self, f: impl FnOnce(&Engine) -> T) -> ModelResult<T> {
         if !self.model_path.exists() {
-            return Err(ModelError::new(format!(
-                "Model file not found: {:?}",
-                self.model_path
-            )));
+            return Err(ModelError::new(format!("Model file not found: {:?}", self.model_path)));
         }
 
-        let mut guard = self
-            .engine
-            .lock()
-            .map_err(|_| ModelError::new("model engine lock poisoned"))?;
+        let mut guard =
+            self.state.lock().map_err(|_| ModelError::new("model engine lock poisoned"))?;
 
-        if guard.is_none() {
+        if guard.engine.is_none() {
             let backend = LlamaBackend::init()
                 .map_err(|e| ModelError::new(format!("backend init failed: {e}")))?;
-            let model = LlamaModel::load_from_file(
-                &backend,
-                &self.model_path,
-                &Default::default(),
-            )
-            .map_err(|e| ModelError::new(format!("model load failed: {e}")))?;
-            *guard = Some(Engine { backend, model });
+            let params = LlamaModelParams::default().with_use_mmap(true).with_use_mlock(false);
+            let model = LlamaModel::load_from_file(&backend, &self.model_path, &params)
+                .map_err(|e| ModelError::new(format!("model load failed: {e}")))?;
+            guard.engine = Some(Engine { backend, model });
         }
 
-        Ok(f(guard.as_ref().unwrap()))
+        let engine = guard.engine.as_ref().ok_or_else(|| ModelError::new("model unavailable"))?;
+        let result = f(engine);
+        guard.last_used = Instant::now();
+        Ok(result)
     }
 }
 
@@ -80,14 +82,13 @@ impl CompletionModel for LlamaCppAdapter {
             return Err(ModelError::new("prompt too long"));
         }
 
-        let start = std::time::Instant::now();
         let result = self.with_engine(|engine| generate_suffix(engine, &context, &cancel))?;
 
         if cancel.is_cancelled() {
             return Err(ModelError::new("request cancelled"));
         }
 
-        let (suffix, source) = match result {
+        let (suffix, source, ttft_ms) = match result {
             Some(r) => r,
             None => {
                 tracing::warn!("model produced no suffix; prompt={:?}", context.line_prefix);
@@ -120,7 +121,8 @@ impl CompletionModel for LlamaCppAdapter {
             // 分支2: 用户输入长于模型输出(已超出模型建议) → 无建议
             tracing::debug!(
                 "no suggestion (user already typed beyond model); prefix={:?} out={:?}",
-                context.line_prefix, out
+                context.line_prefix,
+                out
             );
             return Err(ModelError::new("user input already extends past model output"));
         } else {
@@ -128,7 +130,8 @@ impl CompletionModel for LlamaCppAdapter {
             //         把它整体作为后缀。
             tracing::debug!(
                 "model output used as bare suffix; prefix={:?} out={:?}",
-                context.line_prefix, out
+                context.line_prefix,
+                out
             );
             // 若 out 首字符是字母/'-'(像是命令或参数), 前面补一个空格与 user 分隔
             let first = out.chars().next().unwrap_or(' ');
@@ -143,12 +146,16 @@ impl CompletionModel for LlamaCppAdapter {
             return Err(ModelError::new("no valid suffix generated"));
         }
 
-        Ok(ModelOutput {
-            suffix,
-            ttft_ms: start.elapsed().as_millis() as u64,
-            model_id: "llama-cpp-2".to_string(),
-            source,
-        })
+        Ok(ModelOutput { suffix, ttft_ms, source })
+    }
+
+    fn unload_if_idle(&self, max_idle: std::time::Duration) {
+        if let Ok(mut state) = self.state.try_lock() {
+            if state.engine.is_some() && state.last_used.elapsed() >= max_idle {
+                state.engine = None;
+                tracing::debug!("unloaded idle model runtime");
+            }
+        }
     }
 }
 
@@ -156,27 +163,10 @@ fn generate_suffix(
     engine: &Engine,
     context: &ModelContext,
     cancel: &CancellationToken,
-) -> Option<(String, protocol::SuggestionSource)> {
-    // Fast path: a retrieval candidate already extends the typed prefix.
-    // Deterministic, correct, and instant — ideal for common completions.
-    if let Some(candidate) = context.retrieval_candidates.first() {
-        if candidate.command.starts_with(&context.line_prefix) {
-            let suffix = &candidate.command[context.line_prefix.len()..];
-            if !suffix.is_empty()
-                && super::validate::validate_suffix(suffix, &context.line_prefix)
-            {
-                return Some((
-                    suffix.to_string(),
-                    protocol::SuggestionSource::Memory,
-                ));
-            }
-        }
-    }
-
-    // Fallback path: model generation for unseen prefixes.
-    llama_generate_suffix(engine, context, cancel).map(|s| {
-        (s, protocol::SuggestionSource::Model)
-    })
+) -> Option<(String, protocol::SuggestionSource, u64)> {
+    // Memory hits are resolved by the scheduler before the model is loaded.
+    llama_generate_suffix(engine, context, cancel)
+        .map(|(suffix, ttft)| (suffix, protocol::SuggestionSource::Model, ttft))
 }
 
 /// Runs greedy token generation to extend the prompt with a completion. The
@@ -186,21 +176,16 @@ fn llama_generate_suffix(
     engine: &Engine,
     context: &ModelContext,
     cancel: &CancellationToken,
-) -> Option<String> {
+) -> Option<(String, u64)> {
     // 用 instruct 模型的 chat template 构造对话式 prompt,而不是裸续写。
     // 这是关键:Qwen2.5-Instruct 必须收到明确的"你在补全 shell 命令"指令,
     // 否则裸续写会把它当作散文/补丁/包名来续(N 是之前垃圾输出根因)。
     let prompt = build_instruct_prompt(&engine.model, &context.line_prefix);
     if let Some(prompt) = prompt {
-        let prompt_tokens = engine
-            .model
-            .str_to_token(&prompt, AddBos::Always)
-            .ok()?;
+        let prompt_tokens = engine.model.str_to_token(&prompt, AddBos::Always).ok()?;
         tracing::debug!("instruct prompt={:?}", prompt);
         tracing::debug!("prompt tokens={}", prompt_tokens.len());
-        return llama_complete_from_tokens(
-            engine, &prompt_tokens, context, cancel,
-        );
+        return llama_complete_from_tokens(engine, &prompt_tokens, context, cancel);
     }
 
     // chat template 不可用时的兜底:回到裸续写。
@@ -214,10 +199,7 @@ fn llama_generate_suffix(
 ///   user=prefix, assistant=完整命令, 且【没有 system 消息】。
 /// 推理时若加了 system / 指令,会偏离训练分布,导致微调模型发挥失常。
 /// 因此这里只放一个 user 消息(内容=前缀),让模型按训练学到的续出完整命令。
-fn build_instruct_prompt(
-    model: &LlamaModel,
-    prefix: &str,
-) -> Option<String> {
+fn build_instruct_prompt(model: &LlamaModel, prefix: &str) -> Option<String> {
     let tmpl = model.chat_template(None).ok()?;
 
     // 训练/推理对齐:用训练时见过的 Qwen 默认 system prompt。
@@ -226,21 +208,14 @@ fn build_instruct_prompt(
     // 这里必须和训练脚本 tokenize_sample 里的 system 完全一致。
     let system = LlamaChatMessage::new(
         "system".to_string(),
-        "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."
-            .to_string(),
+        "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.".to_string(),
     )
     .ok()?;
 
-    let user = LlamaChatMessage::new(
-        "user".to_string(),
-        prefix.to_string(),
-    )
-    .ok()?;
+    let user = LlamaChatMessage::new("user".to_string(), prefix.to_string()).ok()?;
 
     // add_ass=true:在末尾补上 assistant 起始符,让模型从这里续写。
-    let rendered = model
-        .apply_chat_template(&tmpl, &[system, user], /*add_ass=*/ true)
-        .ok()?;
+    let rendered = model.apply_chat_template(&tmpl, &[system, user], /*add_ass=*/ true).ok()?;
 
     Some(rendered)
 }
@@ -251,12 +226,13 @@ fn llama_complete_from_tokens(
     prompt_tokens: &[LlamaToken],
     _context: &ModelContext,
     cancel: &CancellationToken,
-) -> Option<String> {
-    let ctx_params = LlamaContextParams::default();
-    let mut ctx = engine
-        .model
-        .new_context(&engine.backend, ctx_params)
-        .ok()?;
+) -> Option<(String, u64)> {
+    const MAX_OUTPUT_TOKENS: usize = 24;
+    let ctx_params = LlamaContextParams::default()
+        .with_n_ctx(NonZeroU32::new(256))
+        .with_n_batch(256)
+        .with_n_ubatch(256);
+    let mut ctx = engine.model.new_context(&engine.backend, ctx_params).ok()?;
 
     //   grammar → penalties(重复惩罚) → greedy
     // 1) grammar:仅允许符合 single_line 的 token(格式约束)
@@ -278,33 +254,36 @@ fn llama_complete_from_tokens(
     // 重复惩罚:覆盖最近 64 个 token。repeat>1 打击任何已出现 token(防循环),
     // freq/present>0 让模型倾向新内容而非车轱辘话。
     samplers.push(LlamaSampler::penalties(
-        /*penalty_last_n=*/ 64,
-        /*penalty_repeat=*/ 1.20,
-        /*penalty_freq=*/ 0.15,
+        /*penalty_last_n=*/ 64, /*penalty_repeat=*/ 1.20, /*penalty_freq=*/ 0.15,
         /*penalty_present=*/ 0.0,
     ));
     samplers.push(LlamaSampler::greedy());
     let mut sampler = LlamaSampler::chain_simple(samplers);
 
-    let mut batch = LlamaBatch::new(prompt_tokens.len() + 64, 1);
+    if prompt_tokens.len() + MAX_OUTPUT_TOKENS > 256 {
+        return None;
+    }
+    let mut batch = LlamaBatch::new(prompt_tokens.len() + MAX_OUTPUT_TOKENS, 1);
 
     // Prefill the prompt.
     for (i, token) in prompt_tokens.iter().enumerate() {
-        batch
-            .add(*token, i as i32, &[0], i + 1 == prompt_tokens.len())
-            .ok()?;
+        batch.add(*token, i as i32, &[0], i + 1 == prompt_tokens.len()).ok()?;
     }
     ctx.decode(&mut batch).ok()?;
 
     let mut generated = String::new();
+    let mut decoder = encoding_rs::UTF_8.new_decoder();
+    let generation_started = Instant::now();
+    let mut ttft_ms = None;
     let eos_token: i32 = -1; // llama's EOS is -1 when no explicit EOS token id is set
 
-    for pos in prompt_tokens.len()..prompt_tokens.len() + 64 {
+    for pos in prompt_tokens.len()..prompt_tokens.len() + MAX_OUTPUT_TOKENS {
         if cancel.is_cancelled() {
             return None;
         }
 
         let token: LlamaToken = sampler.sample(&ctx, -1);
+        ttft_ms.get_or_insert_with(|| generation_started.elapsed().as_millis() as u64);
 
         // Stop on end-of-string/turn markers.
         if token.0 == eos_token || token_string_marker(&token) {
@@ -312,7 +291,7 @@ fn llama_complete_from_tokens(
             break;
         }
 
-        let piece = match engine.model.token_to_str(token, Special::Plaintext) {
+        let piece = match engine.model.token_to_piece(token, &mut decoder, false, None) {
             Ok(p) => p,
             Err(_) => break,
         };
@@ -335,11 +314,8 @@ fn llama_complete_from_tokens(
 
     // Reject empty or multiline leftovers.
     let cleaned = clean_suffix(&generated);
-    tracing::debug!(
-        "llama_complete raw={:?} cleaned={:?}",
-        generated, cleaned
-    );
-    cleaned
+    tracing::debug!("llama_complete raw={:?} cleaned={:?}", generated, cleaned);
+    cleaned.map(|suffix| (suffix, ttft_ms.unwrap_or_default()))
 }
 
 /// Heuristic: stop when a token is the EOS (id 0 for most tokenizers).

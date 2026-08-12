@@ -114,13 +114,17 @@ impl CompletionResult {
         valid_for_line_hash: String,
         source: SuggestionSource,
         daemon_latency_ms: u64,
+        ttft_ms: Option<u64>,
     ) -> Self {
+        let suffix_hex = suffix.as_bytes().iter().map(|byte| format!("{byte:02x}")).collect();
         Self::Suggestion(SuggestionData {
             suffix,
+            suffix_hex,
             replacement_start,
             valid_for_line_hash,
             source,
             daemon_latency_ms,
+            ttft_ms,
         })
     }
 }
@@ -130,6 +134,10 @@ impl CompletionResult {
 pub struct SuggestionData {
     /// 与当前命令同行的后缀，在光标后渲染（绝不包含换行、回车符或 NUL）。
     pub suffix: String,
+    /// UTF-8 bytes of `suffix` encoded as lowercase hexadecimal. Shell hooks
+    /// use this additive field to avoid parsing escaped JSON strings with
+    /// grep/sed. Older clients can continue reading `suffix`.
+    pub suffix_hex: String,
     /// 后缀开始处的光标偏移；通常等于请求的光标。保留给钩子用于正确定位。
     pub replacement_start: usize,
     /// 请求行的指纹（哈希）。钩子在渲染前会将其与当前行比对，从而绝不会
@@ -139,6 +147,10 @@ pub struct SuggestionData {
     pub source: SuggestionSource,
     /// 守护进程内的延迟（毫秒），从接收请求那一刻起测量。
     pub daemon_latency_ms: u64,
+    /// Time to first generated token for model suggestions. Absent for the
+    /// SQLite memory fast path and older daemon implementations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ttft_ms: Option<u64>,
 }
 
 /// 建议的来源，主要用于诊断和基准测试。
@@ -282,6 +294,23 @@ pub struct MemoryRecordParams {
     pub command: String,
 }
 
+/// 守护进程对 *memory.record* 请求的确认回复。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryRecordResponse {
+    /// 恒为 `"2.0"`。
+    pub jsonrpc: String,
+    /// 回显记录请求的 id。
+    pub id: String,
+    /// 记录操作的结果。
+    pub result: MemoryRecordResult,
+}
+
+/// 命令是否已交给本地记忆层处理。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryRecordResult {
+    pub recorded: bool,
+}
+
 // ===========================================================================
 // JsonRpcMessage —— 非标签化（untagged）的分发联合
 // ===========================================================================
@@ -310,9 +339,23 @@ impl JsonRpcMessage {
     /// 返回被封装的请求的 RPC 方法名，而不重新序列化。用于日志和路由。
     pub fn method(&self) -> &str {
         match self {
-            Self::Request(_) => "completion.request",
-            Self::Cancel(_) => "session.cancel",
-            Self::Record(_) => "memory.record",
+            Self::Request(request) => &request.method,
+            Self::Cancel(request) => &request.method,
+            Self::Record(request) => &request.method,
+        }
+    }
+
+    pub fn has_valid_envelope(&self) -> bool {
+        match self {
+            Self::Request(request) => {
+                request.jsonrpc == JSONRPC_VERSION && request.method == "completion.request"
+            }
+            Self::Cancel(request) => {
+                request.jsonrpc == JSONRPC_VERSION && request.method == "session.cancel"
+            }
+            Self::Record(request) => {
+                request.jsonrpc == JSONRPC_VERSION && request.method == "memory.record"
+            }
         }
     }
 
@@ -323,5 +366,68 @@ impl JsonRpcMessage {
             Self::Cancel(r) => &r.id,
             Self::Record(r) => &r.id,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn suggestion_includes_shell_safe_utf8_hex() {
+        let response = CompletionResponse {
+            jsonrpc: JSONRPC_VERSION.into(),
+            id: "request-1".into(),
+            result: CompletionResult::suggestion(
+                " --message=\"你好\" \\ path".into(),
+                3,
+                "hash".into(),
+                SuggestionSource::Model,
+                1,
+                Some(1),
+            ),
+        };
+        let json = serde_json::to_value(response).unwrap();
+        let suffix = json["result"]["suffix"].as_str().unwrap();
+        let encoded = json["result"]["suffix_hex"].as_str().unwrap();
+        let decoded = (0..encoded.len())
+            .step_by(2)
+            .map(|index| u8::from_str_radix(&encoded[index..index + 2], 16).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(String::from_utf8(decoded).unwrap(), suffix);
+    }
+
+    #[test]
+    fn rejects_method_that_only_matches_parameter_shape() {
+        let request = CompletionRequest::new(
+            "request-1".into(),
+            CompletionParams {
+                session_id: "session".into(),
+                shell_kind: "zsh".into(),
+                line: "git".into(),
+                cursor: 3,
+                cwd: "/tmp".into(),
+                deadline_ms: 100,
+                client_sent_at_ms: 0,
+            },
+        );
+        let mut value = serde_json::to_value(request).unwrap();
+        value["method"] = "memory.record".into();
+        let message: JsonRpcMessage = serde_json::from_value(value).unwrap();
+        assert!(!message.has_valid_envelope());
+    }
+
+    #[test]
+    fn memory_record_response_escapes_request_id() {
+        let response = MemoryRecordResponse {
+            jsonrpc: JSONRPC_VERSION.into(),
+            id: "record-\"quoted\"".into(),
+            result: MemoryRecordResult { recorded: true },
+        };
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let decoded: MemoryRecordResponse = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(decoded.id, "record-\"quoted\"");
+        assert!(decoded.result.recorded);
     }
 }

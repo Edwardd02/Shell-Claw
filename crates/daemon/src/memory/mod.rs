@@ -4,8 +4,6 @@ pub mod retrieve;
 pub mod schema;
 pub mod store;
 
-use std::sync::Arc;
-
 pub type MemoryResult<T> = Result<T, MemoryError>;
 
 #[derive(Debug, Clone)]
@@ -15,11 +13,17 @@ pub struct MemoryError {
 
 impl MemoryError {
     pub fn new(msg: impl Into<String>) -> Self {
-        Self {
-            message: msg.into(),
-        }
+        Self { message: msg.into() }
     }
 }
+
+impl std::fmt::Display for MemoryError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for MemoryError {}
 
 #[derive(Debug, Clone)]
 pub struct CommandMemoryInput {
@@ -38,13 +42,7 @@ pub struct RetrievalQuery {
 
 #[derive(Debug, Clone)]
 pub struct RetrievalCandidate {
-    pub entry_id: i64,
     pub command: String,
-    pub cwd: String,
-    pub bm25_score: f64,
-    pub cwd_score: f64,
-    pub frequency_score: f64,
-    pub recency_score: f64,
     pub final_score: f64,
 }
 
@@ -52,5 +50,3 @@ pub trait MemoryStore: Send + Sync {
     fn record_command(&self, entry: CommandMemoryInput) -> MemoryResult<()>;
     fn retrieve(&self, query: RetrievalQuery) -> MemoryResult<Vec<RetrievalCandidate>>;
 }
-
-pub type SharedMemoryStore = Arc<dyn MemoryStore>;

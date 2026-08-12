@@ -6,7 +6,7 @@
 
 ### GitHub-Copilot-style ghost text completions for your shell, running fully on-device
 
-> A local LLM + Rust daemon + shell hook that completes your Zsh / Bash command
+> A local LLM + Rust daemon + shell hook that completes your Zsh command
 > line as you type. A lightweight SQLite command memory learns your habits for
 > instant recall, and a local language model (llama.cpp) infers smart
 > completions beyond your history. Nothing leaves your machine.
@@ -45,6 +45,7 @@ brew trust edwardd02/shellclaw && brew install shellclaw
 2. Automatically download the model into `~/.shellclaw/models/` by probing
    **Hugging Face and ModelScope**, picking the faster source, and falling back
    to the other if one fails
+3. Add an idempotent ShellClaw block to `~/.zshrc` and start the daemon
 
 If the model download is interrupted, just re-run `brew postinstall shellclaw`.
 
@@ -66,13 +67,10 @@ cargo build --release
 
 ## 🚗 Usage
 
-Once installed, ShellClaw runs in the background as a daemon. Start it, and
-open a **new terminal** to get completions.
+Once installed, open a **new Zsh terminal** to get completions. Homebrew starts
+the daemon and configures the hook automatically.
 
 ```bash
-# Start the daemon (background)
-shellclaw start
-
 # Check status
 shellclaw status
 # → shellclaw: running
@@ -105,7 +103,7 @@ manually in the current shell:
 ```bash
 source /path/to/shellclaw.zsh     # Zsh
 # or
-source /path/to/shellclaw.bash    # Bash
+source /path/to/shellclaw.bash    # Bash (experimental)
 ```
 
 ### Configuration
@@ -138,14 +136,11 @@ Install, start, and you're completing commands in under a minute.
 brew tap edwardd02/shellclaw
 brew trust edwardd02/shellclaw && brew install shellclaw
 
-# 2. Start the daemon
-shellclaw start
-
-# 3. Verify it's running
+# 2. Verify it's running
 shellclaw status
 # → shellclaw: running
 
-# 4. Open a NEW terminal and start typing
+# 3. Open a NEW Zsh terminal and start typing
 ```
 
 Open a new terminal and type a command:
@@ -175,7 +170,7 @@ accept, or just keep typing to ignore it.
 | **Non-blocking** | Completions run asynchronously — even if the daemon hangs, your shell input is unaffected |
 | **Silent degradation** | When the daemon is missing, slow, or errors, the shell falls back to native behavior — zero errors, zero interruption |
 | **Privacy** | LLM + memory run 100% on-device; nothing ever leaves your machine |
-| **Zsh / Bash** | Out-of-the-box support for both major shells |
+| **Shell support** | Zsh is fully supported and auto-configured; Bash is experimental and manual |
 
 ---
 
@@ -193,11 +188,12 @@ Keystrokes → Shell Hook (zle) → Unix Socket → Rust Daemon
                         Return completion suffix → Hook renders Ghost Text
 ```
 
-Three layers with clear separation of concerns:
+Four layers with explicit boundaries:
 
 - **Shell Hook**: listens to keys, debounces, sends requests, renders gray completions — never touches main shell input
-- **Rust Daemon**: resident background process, drives the local LLM + memory, talks to the hook over a Unix socket
-- **Local LLM + Memory**: llama.cpp inference + SQLite memory, all on-device
+- **Rust Daemon / scheduler**: owns JSON-RPC, deadlines, cancellation, and worker dispatch
+- **SQLite memory**: FTS5 fast path behind the `MemoryStore` trait
+- **Local model**: llama.cpp fallback behind the `CompletionModel` trait
 
 **Data flow (one completion)**:
 
@@ -208,7 +204,7 @@ Hook sends JSON-RPC completion.request
    ↓
 Daemon retrieves relevant commands from memory (fast, personalized)
    ↓
-Local LLM generates the completion, guided by those memory candidates
+If memory has no valid suffix, the local LLM generates a fallback
    ↓
 Return suffix "ckout main" → Hook renders gray "ckout main" right of cursor
   press Tab/→ to accept, or keep typing to clear
@@ -228,6 +224,8 @@ shellclaw start           Start the daemon in the background
 shellclaw stop            Stop the daemon
 shellclaw status          Show running status
 shellclaw log on|off      Enable/disable file logging (persisted)
+shellclaw setup PATH      Idempotently configure the Zsh hook
+shellclaw --version       Show the installed version
 shellclaw help            Show help
 ```
 
@@ -249,6 +247,8 @@ shellclaw log off
 
 - **100% local**: command memory (SQLite) and model inference all happen on your machine; nothing is ever sent out
 - **No telemetry**: we do not collect any usage data
+- **Private by default**: interaction and daemon file logs are disabled unless explicitly enabled
+- **Low idle footprint**: the model runtime unloads after 30 idle seconds; the daemon stays available
 - **Fully removable**: delete `~/.shellclaw/` to clear all data and config (zero residue)
 
 ---
@@ -287,4 +287,3 @@ zsh-autosuggestions mechanically echoes words from your shell history. **ShellCl
 Thanks for checking out ShellClaw! If it makes your terminal nicer to use, a star is the best support.
 
 **[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[Report an issue](https://github.com/Edwardd02/Shell-Claw/issues)**
-

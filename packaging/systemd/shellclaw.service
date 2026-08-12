@@ -8,8 +8,6 @@ ExecStart=/home/%u/.local/bin/shellclaw daemon
 Restart=always
 RestartSec=5
 
-Environment=SHELLCLAW_SOCKET_PATH=%h/.shellclaw/daemon.sock
-Environment=SHELLCLAW_MODEL_PATH=/opt/homebrew/share/shellclaw/models/qwen2.5-coder-0.5b-instruct-finetuned.gguf
 Environment=SHELLCLAW_DATA_DIR=%h/.shellclaw
 
 StandardOutput=append:%h/.shellclaw/daemon.stdout.log
