@@ -2,15 +2,16 @@
 
 # ⚡ ShellClaw
 
-**Privacy-first smart terminal completion**
+**LLM-powered smart terminal completion powered by a local model**
 
-### Ghost text completions that follow your command line, like GitHub Copilot
+### GitHub-Copilot-style ghost text completions for your shell, running fully on-device
 
-> A Rust daemon + shell hook that gives Zsh / Bash instant gray next-word
-> completions. Local SQLite command memory + optional local model inference.
-> Data never leaves your machine. Zero-touch install.
+> A local LLM + Rust daemon + shell hook that completes your Zsh / Bash command
+> line as you type. A lightweight SQLite command memory learns your habits for
+> instant recall, and a local language model (llama.cpp) infers smart
+> completions beyond your history. Nothing leaves your machine.
 
-**Local-first &nbsp;·&nbsp; Private &nbsp;·&nbsp; Zero-touch &nbsp;·&nbsp; Self-hostable**
+**Local LLM &nbsp;·&nbsp; Private-by-design &nbsp;·&nbsp; Zero-touch &nbsp;·&nbsp; Memory-augmented**
 
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -56,13 +57,13 @@ shellclaw status
 
 | Capability | Description |
 |------|------|
-| **Ghost Text completion** | A gray single-line hint right after the cursor, never distrupting your typing |
+| **Local LLM completion** | A local language model (via llama.cpp) generates the completion, not a fixed rule — it understands shell commands and infers the next words |
+| **Memory-augmented** | Your SQLite command memory ranks suggestions by what *you* actually run, keeping the LLM fast and relevant — frequency, recency, cwd |
+| **Ghost text UX** | A gray single-line hint right after the cursor, never disrupting your typing |
 | **Accept keys** | `Tab` or `→` accepts instantly; keep typing to replace or clear seamlessly |
 | **Non-blocking** | Completions run asynchronously — even if the daemon hangs, your shell input is unaffected |
-| **Local command memory** | SQLite + FTS5 hybrid ranking (BM25 + cwd relevance + frequency + recency) learns your common commands |
-| **Local model inference** | Optional local GGUF model for smart guesses on commands outside memory |
 | **Silent degradation** | When the daemon is missing, slow, or errors, the shell falls back to native behavior — zero errors, zero interruption |
-| **Privacy** | Everything is stored locally; your memory never leaves the machine |
+| **Privacy** | LLM + memory run 100% on-device; nothing ever leaves your machine |
 | **Zsh / Bash** | Out-of-the-box support for both major shells |
 
 ---
@@ -72,9 +73,9 @@ shellclaw status
 ```
 Keystrokes → Shell Hook (zle) → Unix Socket → Rust Daemon
                                               ↓
-                              SQLite command memory (FTS5)
+                  SQLite command memory (FTS5) — re-ranking + personal priors
                                               ↓
-                              Local model inference (llama.cpp, optional)
+                   Local LLM (llama.cpp) — the completion brain
                                               ↓
                         Return completion suffix → Hook renders Ghost Text
 ```
@@ -82,8 +83,8 @@ Keystrokes → Shell Hook (zle) → Unix Socket → Rust Daemon
 Three layers with clear separation of concerns:
 
 - **Shell Hook**: listens to keys, debounces, sends requests, renders gray completions — never touches main shell input
-- **Rust Daemon**: resident background process, handles retrieval/inference, talks to the hook over a Unix socket
-- **Storage/Inference**: SQLite memory + optional local model, all local
+- **Rust Daemon**: resident background process, drives the local LLM + memory, talks to the hook over a Unix socket
+- **Local LLM + Memory**: llama.cpp inference + SQLite memory, all on-device
 
 **Data flow (one completion)**:
 
@@ -92,12 +93,13 @@ You type "git che" in the terminal
    ↓ pause briefly (debounce)
 Hook sends JSON-RPC completion.request
    ↓
-Daemon checks local memory → hit: subtract prefix, get suffix "ckout main"
-                              miss: fall back to the local model
+Daemon retrieves relevant commands from memory (fast, personalized)
    ↓
-Returns {"kind":"suggestion","suffix":"ckout main"}
+Local LLM generates the completion, guided by those memory candidates
    ↓
-Hook renders gray "ckout main" right of the cursor
+Return suffix "ckout main" → Hook renders gray "ckout main" right of cursor
+  press Tab/→ to accept, or keep typing to clear
+```
   press Tab/→ to accept, or keep typing to clear
 ```
 
@@ -168,19 +170,22 @@ export SHELLCLAW_MODEL_PATH=/path/to/your/model.gguf
 
 ## ❓ FAQ
 
+**What is ShellClaw, really?**
+It's a **local large language model running on your machine** that completes shell commands as you type. Your SQLite command history tunes the LLM's suggestions to your habits — fast and personal.
+
 **Will completions disrupt my shell?**
 No. Completions only show as gray text right of the cursor and never affect what you've typed. Even when the daemon is completely unavailable, the shell keeps working normally with zero errors.
 
 **How does ShellClaw learn my commands?**
-Whenever you press Enter on a command, ShellClaw records it into local memory in the background. When you later type the same or a similar prefix, it prioritizes what you've actually used. It purely learns your own habits — private and precise.
+Every command you run is recorded into local memory. The LLM uses those records to bias its completions toward what you actually do — so it's both smart (LLM) and personal (your history). All of it stays on your machine.
 
 **Why is no completion shown sometimes?**
 - The command is already complete (e.g. you already typed the full `git commit`)
-- Neither memory nor the model is confident → it stays silent (better nothing than wrong)
+- The LLM isn't confident → it stays silent (better nothing than wrong)
 - The daemon isn't running → the hook degrades silently
 
 **How is this different from zsh-autosuggestions?**
-zsh-autosuggestions matches mechanically against shell history. ShellClaw additionally combines local memory + an optional model, and uses a separate Rust daemon, enabling richer ranking and reasoning.
+zsh-autosuggestions mechanically echoes words from your shell history. **ShellClaw generates completions with a real LLM** that understands shell semantics, and uses your history only to make the LLM faster and more personal. It can suggest commands you've never typed before.
 
 ---
 

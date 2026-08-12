@@ -2,14 +2,15 @@
 
 # ⚡ ShellClaw
 
-**本地优先的智能终端补全（Smart Shell Completion）**
+**大语言模型驱动的智能终端补全（LLM-powered Smart Shell Completion）**
 
-### Ghost Text 补全，像 GitHub Copilot 一样贴合你的命令行
+### 本地大语言模型 + 命令行 Ghost Text 补全，像 GitHub Copilot 一样、但完全在本地运行
 
-> Rust 守护进程 + Shell 钩子，为 Zsh / Bash 提供即时的灰色下一词补全。
-> 本地 SQLite 命令记忆 + 可选本地模型推理，数据不出机器，零触感安装。
+> 一个本地 LLM + Rust 守护进程 + Shell 钩子，边输入边补全你的 Zsh / Bash 命令。
+> 轻量 SQLite 命令记忆学习你的习惯、实现秒级召回；本地语言模型（llama.cpp）
+> 在历史之外还能智能联想。数据不出机器。
 
-**本地优先 &nbsp;·&nbsp; 隐私安全 &nbsp;·&nbsp; 零触感 &nbsp;·&nbsp; 可自托管**
+**本地 LLM &nbsp;·&nbsp; 天生私密 &nbsp;·&nbsp; 零触感 &nbsp;·&nbsp; 记忆增强**
 
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -54,13 +55,13 @@ shellclaw status
 
 | 能力 | 说明 |
 |------|------|
-| **Ghost Text 补全** | 灰色单行提示紧跟光标，绝不打断你的输入 |
-| **接受键** | `Tab` 或 `右箭头` 立即接受；继续打字则无缝替换或清除 |
+| **本地 LLM 补全** | 一个本地语言模型（llama.cpp）负责生成补全,而非固定规则——它理解 shell 命令并推断下一个词 |
+| **记忆增强** | SQLite 命令记忆按你自己真正用过的命令重排,让 LLM 更快更贴合——频率、时效、目录相关性 |
+| **Ghost Text 体验** | 灰色单行提示紧跟光标,绝不打断你的输入 |
+| **接受键** | `Tab` 或 `右箭头` 立即接受;继续打字则无缝替换或清除 |
 | **非阻塞** | 补全请求异步进行,即便 daemon 卡死,shell 输入也完全不受影响 |
-| **本地命令记忆** | SQLite + FTS5 混合排序(BM25 + 目录相关性 + 频率 + 时间衰减),自动学习你的常用命令 |
-| **本地模型推理** | 可选接入本地 GGUF 模型,对记忆外的命令智能联想 |
 | **静默降级** | daemon 缺失/超时/异常时,shell 自动回退原生行为,零报错、零打断 |
-| **隐私安全** | 全部数据存本地,记忆不出机器 |
+| **隐私安全** | LLM + 记忆 100% 本地运行,数据绝不出机器 |
 | **Zsh / Bash** | 两大主流 shell 原生支持 |
 
 ---
@@ -70,9 +71,9 @@ shellclaw status
 ```
 用户键盘 → Shell Hook(zle) → Unix Socket → Rust Daemon
                                         ↓
-                              SQLite 命令记忆(FTS5)
+              SQLite 命令记忆(FTS5) — 重排 + 个人先验
                                         ↓
-                              本地模型推理(llama.cpp, 可选)
+              本地 LLM(llama.cpp) — 补全大脑
                                         ↓
                             返回补全后缀 → Hook 渲染 Ghost Text
 ```
@@ -80,8 +81,8 @@ shellclaw status
 三层关注点分离:
 
 - **Shell Hook**: 监听按键、去抖、发请求、渲染灰色补全,绝不影响 shell 主输入
-- **Rust Daemon**: 常驻后台,处理检索/推理,通过 Unix Socket 与 hook 通信
-- **存储/推理**: SQLite 记忆 + 可选本地模型,全部本地
+- **Rust Daemon**: 常驻后台,驱动本地 LLM + 记忆,通过 Unix Socket 与 hook 通信
+- **本地 LLM + 记忆**: llama.cpp 推理 + SQLite 记忆,全部本地
 
 **数据流(单次补全)**:
 
@@ -90,12 +91,11 @@ shellclaw status
    ↓ 停止片刻(防抖)
 Hook 发送 JSON-RPC completion.request
    ↓
-Daemon 查本地记忆 → 命中则减法得后缀 "ckout main"
-                    未命中 → 交给本地模型联想
+Daemon 从记忆检索相关命令(快速、个性化)
    ↓
-返回 {"kind":"suggestion","suffix":"ckout main"}
+本地 LLM 以这些记忆候选为依据,生成补全
    ↓
-Hook 在光标右侧渲染灰色 "ckout main"
+返回后缀 "ckout main" → Hook 在光标右侧渲染灰色 "ckout main"
   按 Tab/→ 接受, 或继续打字 清除
 ```
 
@@ -166,19 +166,22 @@ export SHELLCLAW_MODEL_PATH=/path/to/your/model.gguf
 
 ## ❓ FAQ
 
+**ShellClaw 到底是什么?**
+它是一个运行在你机器上的**本地大语言模型**,在你输入时补全 shell 命令。你的 SQLite 命令历史用来微调它的建议到你的习惯——既快又个人。
+
 **补全会干扰我的 shell 吗?**
 不会。补全只在光标右侧显示灰色文字,不影响已输入内容;且 daemon 完全不可用时,shell 依旧正常工作、零报错。
 
 **补全怎么学会我的命令?**
-当你按回车执行一条命令时,ShellClaw 后台记入本地记忆。之后输入相同/相似开头的命令,它会优先给出你真正用过的。它纯粹学习你自己的习惯,私密且精准。
+每当你按回车执行一条命令,ShellClaw 后台记入本地记忆。LLM 会借这些记录把补全偏好到你的真实习惯——既智能(LLM) 又个人(你的历史)。一切都留在本机。
 
 **为什么有时候不显示补全?**
 - 当前命令已经完整(如已输入完整 `git commit`)
-- 记忆里没有、模型也没把握 → 静默不提示(宁缺毋滥)
+- LLM 没把握 → 静默不提示(宁缺毋滥)
 - daemon 未运行 → hook 自动静默降级
 
 **和 zsh-autosuggestions 有什么区别?**
-zsh-autosuggestions 基于 shell 历史机械匹配;ShellClaw 额外结合本地记忆 + 可选模型,并分离出独立 Rust daemon,支持更复杂的排序与推理。
+zsh-autosuggestions 机械地从 shell 历史里回显单词。**ShellClaw 用一个真正的 LLM 生成补全**,它理解 shell 语义,而你的历史只用于让它更快、更贴个人。它能建议你从未输入过的命令。
 
 ---
 
