@@ -23,9 +23,26 @@ class Shellclaw < Formula
 
     share.install "models" => "shellclaw/models" if File.exist?("models")
     share.install "shell" => "shellclaw/shell" if File.exist?("shell")
+    # 带上自动下载模型脚本(供 install 后拉取模型)
+    share.install "scripts/download-model.sh" => "shellclaw/download-model.sh" if File.exist?("scripts/download-model.sh")
 
     install_shell_hooks
-    start_service
+  end
+
+  # brew install 后自动拉取模型(双源测速选快源)。
+  # 宽松策略:模型下载失败仅警告、不中断 install;用户可稍后 shellclaw model install 补装。
+  def post_install
+    ohai "Downloading ShellClaw model (please wait, may take a while)..."
+    script = share/"shellclaw/download-model.sh"
+    begin
+      if script.exist?
+        system "sh", script.to_s
+      else
+        opoo "download-model.sh not found in package"
+      end
+    rescue StandardError
+      opoo "Model download failed. ShellClaw is installed but the model is missing; run 'shellclaw model install' later."
+    end
   end
 
   def install_shell_hooks
