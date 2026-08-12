@@ -29,9 +29,16 @@
 ### 方式一:Homebrew(推荐)
 
 ```bash
-brew tap --trusted Edwardd02/homebrew-shellclaw
+brew tap edwardd02/shellclaw
+brew trust edwardd02/shellclaw   # 首次信任,否则 brew 拒绝运行第三方公式
 brew install shellclaw
 ```
+
+> Homebrew 默认拒绝执行未受信任 tap 的公式。上面的 `brew trust` 一次即可
+> 解除。或者用环境变量绕过单次检查:
+> ```bash
+> HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew install shellclaw
+> ```
 
 `brew install` 会:
 1. 安装 `shellclaw` 二进制

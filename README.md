@@ -30,9 +30,16 @@
 ### Homebrew (recommended)
 
 ```bash
-brew tap --trusted Edwardd02/homebrew-shellclaw
+brew tap edwardd02/shellclaw
+brew trust edwardd02/shellclaw   # trust it once so brew can run its install hooks
 brew install shellclaw
 ```
+
+> Homebrew refuses to run formulas from untrusted taps by default. The single
+> `brew trust` above clears that once. Alternatively, bypass it for one install:
+> ```bash
+> HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew install shellclaw
+> ```
 
 `brew install` will:
 1. Install the `shellclaw` binary
@@ -129,7 +136,8 @@ Install, start, and you're completing commands in under a minute.
 
 ```bash
 # 1. Install (see Install below for details)
-brew tap --trusted Edwardd02/homebrew-shellclaw
+brew tap edwardd02/shellclaw
+brew trust edwardd02/shellclaw
 brew install shellclaw
 
 # 2. Start the daemon

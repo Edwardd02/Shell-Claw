@@ -29,9 +29,17 @@
 ### Homebrew（推奨）
 
 ```bash
-brew tap --trusted Edwardd02/homebrew-shellclaw
+brew tap edwardd02/shellclaw
+brew trust edwardd02/shellclaw   # 一度信頼する。信頼されていない tap の公式は brew が拒否するため
 brew install shellclaw
 ```
+
+> Homebrew はデフォルトで信頼されていない tap の formula を実行しません。
+> 上記の `brew trust` を一度実行すれば解除されます。あるいは1回だけ環境変数で
+> バイパス:
+> ```bash
+> HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew install shellclaw
+> ```
 
 `brew install` は:
 1. `shellclaw` バイナリをインストール
