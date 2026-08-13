@@ -51,7 +51,6 @@ typeset -g _ssc_connected=0
 typeset -gHi _ssc_fd=-1
 typeset -g _ssc_original_self_insert="_ssc_original_self_insert"
 typeset -g _ssc_original_ctrl_space="set-mark-command"
-typeset -g _ssc_original_right="forward-char"
 typeset -gA _ssc_edit_originals
 
 # 追加一行到 hook 日志(仅 SSC_DEBUG=1 时)。
@@ -285,23 +284,15 @@ _ssc_accept_ctrl_space() {
     _ssc_accept "$_ssc_original_ctrl_space"
 }
 
-_ssc_accept_right_arrow() {
-    _ssc_accept "$_ssc_original_right"
-}
-
 _ssc_init() {
     zle -A self-insert "$_ssc_original_self_insert" 2>/dev/null || return 1
-    local ctrl_space_binding right_binding
+    local ctrl_space_binding
     ctrl_space_binding="$(bindkey '^@' 2>/dev/null)"
-    right_binding="$(bindkey '^[[C' 2>/dev/null)"
     _ssc_original_ctrl_space="${${(z)ctrl_space_binding}[2]:-set-mark-command}"
-    _ssc_original_right="${${(z)right_binding}[2]:-forward-char}"
     zle -N self-insert _ssc_self_insert
     zle -N _ssc_apply_suggestion _ssc_apply_suggestion
     zle -N _ssc_accept_ctrl_space _ssc_accept_ctrl_space
-    zle -N _ssc_accept_right_arrow _ssc_accept_right_arrow
     bindkey '^@' _ssc_accept_ctrl_space
-    bindkey '^[[C' _ssc_accept_right_arrow
 
     local edit_widget
     for edit_widget in \

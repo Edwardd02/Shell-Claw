@@ -1,289 +1,201 @@
 <div align="center">
 
-# ⚡ ShellClaw
+# ShellClaw
 
-**LLM-powered smart terminal completion powered by a local model**
+### Local LLM autocomplete for your terminal
 
-### GitHub-Copilot-style ghost text completions for your shell, running fully on-device
+**ShellClaw predicts the rest of your Zsh command and renders it as native
+ghost text, powered by a coding model running entirely on your Mac.**
 
-> A local LLM + Rust daemon + shell hook that completes your Zsh command
-> line as you type. A lightweight SQLite command memory learns your habits for
-> instant recall, and a local language model (llama.cpp) infers smart
-> completions beyond your history. Nothing leaves your machine.
+No API key. No cloud round-trip. No command history leaving your machine.
 
-**Local LLM &nbsp;·&nbsp; Private-by-design &nbsp;·&nbsp; Zero-touch &nbsp;·&nbsp; Memory-augmented**
+[![Release](https://img.shields.io/github/v/release/Edwardd02/Shell-Claw?style=flat-square)](https://github.com/Edwardd02/Shell-Claw/releases/latest)
+[![Stars](https://img.shields.io/github/stars/Edwardd02/Shell-Claw?style=flat-square)](https://github.com/Edwardd02/Shell-Claw/stargazers)
+[![Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-black?style=flat-square&logo=apple)](https://www.apple.com/mac/)
+[![Rust](https://img.shields.io/badge/built%20with-Rust-DEA584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![macOS](https://img.shields.io/badge/macOS-✓-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
-[![Linux](https://img.shields.io/badge/Linux-Developing-8A8A8A?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
-
-**[English](README.md)** &nbsp;·&nbsp; **[简体中文](README.zh-CN.md)** &nbsp;·&nbsp; **[日本語](README.ja.md)**
-
-**[Install](#-install)** &nbsp;·&nbsp; **[Usage](#-usage)** &nbsp;·&nbsp; **[Quick Start](#-quick-start)** &nbsp;·&nbsp; **[Features](#-features)** &nbsp;·&nbsp; **[Architecture](#-architecture)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[Privacy](#-privacy--data-safety)** &nbsp;·&nbsp; **[FAQ](#-faq)**
+**[English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)**
 
 </div>
 
----
-## 📦 Install
+## Install
 
-### Homebrew (recommended)
+ShellClaw currently supports **macOS on Apple Silicon** with **Zsh**.
 
 ```bash
 brew tap edwardd02/shellclaw
-brew trust edwardd02/shellclaw && brew install shellclaw
+brew trust edwardd02/shellclaw
+brew install shellclaw
 ```
 
-> Homebrew refuses to run formulas from untrusted taps by default. The single
-> `brew trust` above clears that once. Alternatively, bypass it for one install:
-> ```bash
-> HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew install shellclaw
-> ```
+That installation downloads the local model, adds a managed ShellClaw block to
+`~/.zshrc`, and starts the daemon. The first install can take a little longer
+while the model is downloaded from the faster of Hugging Face or ModelScope.
 
-`brew install` will:
-1. Install the `shellclaw` binary
-2. Automatically download the model into `~/.shellclaw/models/` by probing
-   **Hugging Face and ModelScope**, picking the faster source, and falling back
-   to the other if one fails
-3. Add an idempotent ShellClaw block to `~/.zshrc` and start the daemon
+Open a new terminal and start typing:
 
-If the model download is interrupted, just re-run `brew postinstall shellclaw`.
+```text
+$ git che[ckout main]
+         └───────── gray ghost text
+```
 
-> **Requirements**: macOS Apple Silicon (ARM). Linux and Intel macOS are
-> in development.
-
-### Build from source
+Press **Ctrl+Space** to accept the suggestion. Keep typing to replace it or
+ignore it. ShellClaw leaves `Tab` and the arrow keys to your existing shell
+bindings.
 
 ```bash
-# Requires Rust 1.80+
+shellclaw status
+# shellclaw: running
+```
+
+If the model download was interrupted, resume it with:
+
+```bash
+brew postinstall shellclaw
+```
+
+## Why ShellClaw
+
+- **A real local LLM, not a static completion table.** A fine-tuned
+  Qwen2.5-Coder 0.5B model can infer useful command continuations that are not
+  already in your history.
+- **Gets personal without sending data away.** SQLite FTS5 memory recalls the
+  commands you actually use, with prefix and working-directory context.
+- **Feels like part of the shell.** Suggestions are rendered through Zsh's
+  native `POSTDISPLAY` ghost-text path and only enter the command buffer when
+  you accept them.
+- **Stays out of the way.** Requests are asynchronous, stale work is cancelled,
+  and failures degrade silently without blocking terminal input.
+- **Made for local use.** Inference uses llama.cpp with Metal acceleration;
+  logs are off by default and the model unloads after 30 idle seconds.
+
+## How It Works
+
+```text
+Zsh input
+   │
+   ▼
+ShellClaw ZLE hook ── JSON-RPC over a local Unix socket ──▶ Rust daemon
+                                                           │
+                                      ┌────────────────────┴──────────────────┐
+                                      ▼                                       ▼
+                            SQLite FTS5 memory                     Local Qwen2.5-Coder
+                            fast personal recall                    llama.cpp + Metal
+                                      └────────────────────┬──────────────────┘
+                                                           ▼
+                                              validated completion suffix
+                                                           │
+                                                           ▼
+                                              gray Zsh ghost text
+```
+
+The daemon checks local command memory first. When memory has no valid match,
+the model generates a suffix. The hook accepts only the newest response for the
+current command line, validates it, and keeps the suggestion separate from your
+real input until you press `Ctrl+Space`.
+
+## What You Get
+
+| Area | Implementation |
+|---|---|
+| Model | Fine-tuned Qwen2.5-Coder 0.5B in GGUF format |
+| Inference | llama.cpp with Metal acceleration on Apple Silicon |
+| Personal memory | Local SQLite database with FTS5 retrieval |
+| Interface | Native inline Zsh ghost text; `Ctrl+Space` to accept |
+| Runtime | Rust daemon communicating over a local Unix socket |
+| Privacy | On-device inference, no telemetry, file logging disabled by default |
+| Resource use | Heavy model state unloads after 30 idle seconds |
+| Current support | macOS Apple Silicon + Zsh |
+| Experimental | Bash hook; Linux and Intel macOS are not released yet |
+
+## CLI
+
+```text
+shellclaw status          Show daemon status
+shellclaw start           Start the daemon
+shellclaw stop            Stop the daemon
+shellclaw log on|off      Enable or disable persistent file logging
+shellclaw setup PATH      Install or refresh the managed Zsh hook
+shellclaw --version       Show the installed version
+shellclaw help            Show all commands
+```
+
+Useful environment variables:
+
+```bash
+# Store the model, database, socket, and config somewhere else
+export SHELLCLAW_DATA_DIR=/your/data/directory
+
+# Use a different compatible GGUF model
+export SHELLCLAW_MODEL_PATH=/path/to/model.gguf
+```
+
+## Build From Source
+
+You need Rust 1.80 or newer. Metal acceleration is enabled automatically on
+macOS.
+
+```bash
 git clone https://github.com/Edwardd02/Shell-Claw.git
 cd Shell-Claw
 cargo build --release
+cargo test --workspace
 ```
 
----
+The release installation also needs the packaged Zsh hook and a compatible
+GGUF model. Homebrew remains the simplest complete setup.
 
----
+## Troubleshooting
 
-## 🚗 Usage
-
-Once installed, open a **new Zsh terminal** to get completions. Homebrew starts
-the daemon and configures the hook automatically.
+**No suggestion appears**
 
 ```bash
-# Check status
 shellclaw status
-# → shellclaw: running
+ls ~/.shellclaw/models/*.gguf
 ```
 
-Then type a command in your shell:
+Open a new Zsh terminal after installation. ShellClaw also intentionally stays
+silent when the command is already complete, the response is stale, or no safe
+suffix is available.
 
-```
-$ git che【cursor here, gray hint: ckout main】
-```
-
-Press **Ctrl+Space** or **→** to accept, or keep typing to ignore.
-
-### Common commands
+**The model download stopped**
 
 ```bash
-shellclaw start           # start the daemon in the background
-shellclaw stop            # stop the daemon
-shellclaw status          # check whether the daemon is running
-shellclaw log on|off      # enable / disable file logging (persisted)
-shellclaw help            # list all commands
+brew postinstall shellclaw
 ```
 
-### Automatic loading
+Downloads resume from the partial file and automatically fall back between
+Hugging Face and ModelScope.
 
-The shell hook loads automatically when you open a new terminal after
-installation — no manual `.zshrc` edits required. If you ever need to load it
-manually in the current shell:
+**Ctrl+Space does not reach Zsh**
 
-```bash
-source /path/to/shellclaw.zsh     # Zsh
-# or
-source /path/to/shellclaw.bash    # Bash (experimental)
-```
+Some macOS input-source or terminal shortcuts capture `Ctrl+Space`. Remove or
+rebind that conflicting shortcut so the terminal can send `^@` to Zsh.
 
-### Configuration
+**Remove ShellClaw completely**
 
 ```bash
-# ShellClaw data directory (default ~/.shellclaw)
-export SHELLCLAW_DATA_DIR=~/your/custom/dir
-
-# Model path (if you downloaded a model elsewhere)
-export SHELLCLAW_MODEL_PATH=/path/to/your/model.gguf
-```
-
-### Uninstall
-
-```bash
+shellclaw stop
 brew uninstall shellclaw
-rm -rf ~/.shellclaw    # remove all data & model (zero residue)
+rm -rf ~/.shellclaw
 ```
 
----
+The last command removes the downloaded model and local command memory.
 
----
+## Privacy
 
-## 🚀 Quick Start
+ShellClaw is local-first by construction:
 
-Install, start, and you're completing commands in under a minute.
+- command completion and model inference run on your Mac;
+- command memory stays in `~/.shellclaw/memory.db`;
+- no telemetry or hosted API is used;
+- interaction and daemon file logging are disabled unless you enable them.
 
-```bash
-# 1. Install (see Install below for details)
-brew tap edwardd02/shellclaw
-brew trust edwardd02/shellclaw && brew install shellclaw
+Commands you execute are stored in the local memory database so future
+suggestions can match your habits. Delete `~/.shellclaw` to erase that memory
+and all ShellClaw data.
 
-# 2. Verify it's running
-shellclaw status
-# → shellclaw: running
-
-# 3. Open a NEW Zsh terminal and start typing
-```
-
-Open a new terminal and type a command:
-
-```
-$ git che【cursor here, gray hint: ckout main】
-```
-
-The gray completion appears right of the cursor. Press **Ctrl+Space** or **→** to
-accept, or just keep typing to ignore it.
-
-> Command memory is accumulated automatically as you run commands — the more
-> you use ShellClaw, the better it learns your habits.
-
----
-
----
-
-## ✨ Features
-
-| Capability | Description |
-|------|------|
-| **Local LLM completion** | A local language model (via llama.cpp) generates the completion, not a fixed rule — it understands shell commands and infers the next words |
-| **Memory-augmented** | Your SQLite command memory ranks suggestions by what *you* actually run, keeping the LLM fast and relevant — frequency, recency, cwd |
-| **Ghost text UX** | A gray single-line hint right after the cursor, never disrupting your typing |
-| **Accept keys** | `Ctrl+Space` or `→` accepts instantly; keep typing to replace or clear seamlessly |
-| **Non-blocking** | Completions run asynchronously — even if the daemon hangs, your shell input is unaffected |
-| **Silent degradation** | When the daemon is missing, slow, or errors, the shell falls back to native behavior — zero errors, zero interruption |
-| **Privacy** | LLM + memory run 100% on-device; nothing ever leaves your machine |
-| **Shell support** | Zsh is fully supported and auto-configured; Bash is experimental and manual |
-
----
-
----
-
-## 🏗️ Architecture
-
-```
-Keystrokes → Shell Hook (zle) → Unix Socket → Rust Daemon
-                                              ↓
-                  SQLite command memory (FTS5) — re-ranking + personal priors
-                                              ↓
-                   Local LLM (llama.cpp) — the completion brain
-                                              ↓
-                        Return completion suffix → Hook renders Ghost Text
-```
-
-Four layers with explicit boundaries:
-
-- **Shell Hook**: listens to keys, debounces, sends requests, renders gray completions — never touches main shell input
-- **Rust Daemon / scheduler**: owns JSON-RPC, deadlines, cancellation, and worker dispatch
-- **SQLite memory**: FTS5 fast path behind the `MemoryStore` trait
-- **Local model**: llama.cpp fallback behind the `CompletionModel` trait
-
-**Data flow (one completion)**:
-
-```
-You type "git che" in the terminal
-   ↓ pause briefly (debounce)
-Hook sends JSON-RPC completion.request
-   ↓
-Daemon retrieves relevant commands from memory (fast, personalized)
-   ↓
-If memory has no valid suffix, the local LLM generates a fallback
-   ↓
-Return suffix "ckout main" → Hook renders gray "ckout main" right of cursor
-  press Ctrl+Space/→ to accept, or keep typing to clear
-```
-
----
-
----
-
-## 🛠️ CLI
-
-`shellclaw` is a single self-contained binary with subcommands:
-
-```bash
-shellclaw daemon          Run daemon in the foreground (for service managers)
-shellclaw start           Start the daemon in the background
-shellclaw stop            Stop the daemon
-shellclaw status          Show running status
-shellclaw log on|off      Enable/disable file logging (persisted)
-shellclaw setup PATH      Idempotently configure the Zsh hook
-shellclaw --version       Show the installed version
-shellclaw help            Show help
-```
-
-```bash
-# Logging is off by default (clean). Enable it for diagnostics:
-shellclaw log on
-shellclaw start
-# → starts logging to ~/.shellclaw/daemon.log
-
-# Keep it off in daily use
-shellclaw log off
-```
-
----
-
----
-
-## 🔒 Privacy & Data Safety
-
-- **100% local**: command memory (SQLite) and model inference all happen on your machine; nothing is ever sent out
-- **No telemetry**: we do not collect any usage data
-- **Private by default**: interaction and daemon file logs are disabled unless explicitly enabled
-- **Low idle footprint**: the model runtime unloads after 30 idle seconds; the daemon stays available
-- **Fully removable**: delete `~/.shellclaw/` to clear all data and config (zero residue)
-
----
-
----
-
-## ❓ FAQ
-
-**What is ShellClaw, really?**
-It's a **local large language model running on your machine** that completes shell commands as you type. Your SQLite command history tunes the LLM's suggestions to your habits — fast and personal.
-
-**Will completions disrupt my shell?**
-No. Completions only show as gray text right of the cursor and never affect what you've typed. Even when the daemon is completely unavailable, the shell keeps working normally with zero errors.
-
-**How does ShellClaw learn my commands?**
-Every command you run is recorded into local memory. The LLM uses those records to bias its completions toward what you actually do — so it's both smart (LLM) and personal (your history). All of it stays on your machine.
-
-**Why is no completion shown sometimes?**
-- The command is already complete (e.g. you already typed the full `git commit`)
-- The LLM isn't confident → it stays silent (better nothing than wrong)
-- The daemon isn't running → the hook degrades silently
-
-**How is this different from zsh-autosuggestions?**
-zsh-autosuggestions mechanically echoes words from your shell history. **ShellClaw generates completions with a real LLM** that understands shell semantics, and uses your history only to make the LLM faster and more personal. It can suggest commands you've never typed before.
-
----
-
----
-
-## 📄 License
-
-[MIT License](LICENSE) © 2026 Edwardd02
-
----
-
-Thanks for checking out ShellClaw! If it makes your terminal nicer to use, a star is the best support.
-
-**[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[Report an issue](https://github.com/Edwardd02/Shell-Claw/issues)**
+If ShellClaw makes your terminal more useful, consider giving the project a
+[star](https://github.com/Edwardd02/Shell-Claw) or opening an
+[issue](https://github.com/Edwardd02/Shell-Claw/issues) with real-world
+feedback.

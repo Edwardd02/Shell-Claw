@@ -1,277 +1,192 @@
 <div align="center">
 
-# ⚡ ShellClaw
+# ShellClaw
 
-**大语言模型驱动的智能终端补全（LLM-powered Smart Shell Completion）**
+### 在终端里运行的本地大语言模型补全
 
-### 本地大语言模型 + 命令行 Ghost Text 补全，像 GitHub Copilot 一样、但完全在本地运行
+**ShellClaw 预测 Zsh 命令的后续内容，并以内联灰字显示；背后的代码模型
+完全运行在你的 Mac 上。**
 
-> 一个本地 LLM + Rust 守护进程 + Shell 钩子，边输入边补全你的 Zsh 命令。
-> 轻量 SQLite 命令记忆学习你的习惯、实现秒级召回；本地语言模型（llama.cpp）
-> 在历史之外还能智能联想。数据不出机器。
+不需要 API Key，没有云端推理延迟，命令历史不会离开本机。
 
-**本地 LLM &nbsp;·&nbsp; 天生私密 &nbsp;·&nbsp; 零触感 &nbsp;·&nbsp; 记忆增强**
+[![Release](https://img.shields.io/github/v/release/Edwardd02/Shell-Claw?style=flat-square)](https://github.com/Edwardd02/Shell-Claw/releases/latest)
+[![Stars](https://img.shields.io/github/stars/Edwardd02/Shell-Claw?style=flat-square)](https://github.com/Edwardd02/Shell-Claw/stargazers)
+[![Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-black?style=flat-square&logo=apple)](https://www.apple.com/mac/)
+[![Rust](https://img.shields.io/badge/built%20with-Rust-DEA584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![macOS](https://img.shields.io/badge/macOS-✓-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
-[![Linux](https://img.shields.io/badge/Linux-开发中-8A8A8A?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
-
-**[English](README.md)** &nbsp;·&nbsp; **[简体中文](README.zh-CN.md)** &nbsp;·&nbsp; **[日本語](README.ja.md)**
-
-**[安装](#-安装)** &nbsp;·&nbsp; **[使用](#-使用)** &nbsp;·&nbsp; **[快速开始](#-快速开始)** &nbsp;·&nbsp; **[功能特性](#-功能特性)** &nbsp;·&nbsp; **[架构](#-架构)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[隐私](#-隐私--数据安全)** &nbsp;·&nbsp; **[FAQ](#-faq)**
+**[English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)**
 
 </div>
 
----
-## 📦 安装
+## 安装
 
-### 方式一:Homebrew(推荐)
+ShellClaw 目前支持 **Apple Silicon Mac** 和 **Zsh**。
 
 ```bash
 brew tap edwardd02/shellclaw
-brew trust edwardd02/shellclaw && brew install shellclaw
+brew trust edwardd02/shellclaw
+brew install shellclaw
 ```
 
-> Homebrew 默认拒绝执行未受信任 tap 的公式。上面的 `brew trust` 一次即可
-> 解除。或者用环境变量绕过单次检查:
-> ```bash
-> HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew install shellclaw
-> ```
+安装过程会下载本地模型、向 `~/.zshrc` 写入一段可管理的 ShellClaw 配置，
+并启动 daemon。首次安装需要等待模型下载；ShellClaw 会测速 Hugging Face
+和 ModelScope，优先使用更快的源。
 
-`brew install` 会:
-1. 安装 `shellclaw` 二进制
-2. 自动下载模型到 `~/.shellclaw/models/` —— 同时探测 **Hugging Face 和 ModelScope**,
-   选择较快的源;若其中一个失败会自动切换到另一个
-3. 幂等写入 `~/.zshrc` 的 ShellClaw 标记块，并启动 daemon
+打开一个新终端，然后开始输入：
 
-若模型下载被打断,重跑 `brew postinstall shellclaw` 即可续传。
+```text
+$ git che[ckout main]
+         └───────── 灰色 Ghost Text
+```
 
-> **要求**: macOS Apple Silicon(ARM)。Linux 和 Intel macOS 开发中。
-
-### 方式二:从源码构建
+按 **Ctrl+Space** 接受提示；继续输入则替换或忽略它。ShellClaw 不占用
+`Tab` 和方向键，原有的 Shell 补全和快捷键可以照常使用。
 
 ```bash
-# 需要 Rust 1.80+
+shellclaw status
+# shellclaw: running
+```
+
+如果模型下载中断，可以继续下载：
+
+```bash
+brew postinstall shellclaw
+```
+
+## 为什么选择 ShellClaw
+
+- **真正的本地 LLM，而不是固定补全表。** 微调后的 Qwen2.5-Coder 0.5B
+  能推断命令的后续内容，不局限于简单回放历史记录。
+- **越用越贴合，同时数据不出本机。** SQLite FTS5 记忆会结合命令前缀
+  和当前工作目录，快速召回你真正使用过的命令。
+- **像 Shell 原生能力一样自然。** 提示通过 Zsh 的 `POSTDISPLAY` 路径
+  渲染成紧跟输入的灰字，只有按下接受键后才会进入真实命令缓冲区。
+- **不打断输入。** 请求异步处理，过期任务会被取消；daemon 异常时静默
+  降级，不会卡住或污染终端。
+- **为本地运行设计。** llama.cpp 使用 Apple Silicon Metal 加速；日志默认
+  关闭，模型空闲 30 秒后自动卸载。
+
+## 工作原理
+
+```text
+Zsh 输入
+   │
+   ▼
+ShellClaw ZLE Hook ── 本地 Unix Socket 上的 JSON-RPC ──▶ Rust Daemon
+                                                          │
+                                     ┌────────────────────┴──────────────────┐
+                                     ▼                                       ▼
+                           SQLite FTS5 记忆                       本地 Qwen2.5-Coder
+                           快速个性化召回                         llama.cpp + Metal
+                                     └────────────────────┬──────────────────┘
+                                                          ▼
+                                                   校验补全后缀
+                                                          │
+                                                          ▼
+                                                Zsh 内联灰色提示
+```
+
+daemon 会先查询本地命令记忆；没有有效匹配时，再由模型生成补全后缀。Hook
+只接受当前命令行最新一次请求的结果，并在你按下 `Ctrl+Space` 前始终把提示
+与真实输入分开。
+
+## 项目实况
+
+| 项目 | 当前实现 |
+|---|---|
+| 模型 | 微调 Qwen2.5-Coder 0.5B，GGUF 格式 |
+| 推理 | llama.cpp，Apple Silicon 上使用 Metal 加速 |
+| 个性化记忆 | 本地 SQLite 数据库 + FTS5 检索 |
+| 交互 | Zsh 原生内联灰字；`Ctrl+Space` 接受 |
+| 运行方式 | Rust daemon，通过本地 Unix Socket 通信 |
+| 隐私 | 本地推理、无遥测、文件日志默认关闭 |
+| 资源占用 | 模型空闲 30 秒后卸载，轻量 daemon 保持可用 |
+| 当前完整支持 | macOS Apple Silicon + Zsh |
+| 实验性支持 | Bash Hook；Linux 和 Intel macOS 尚未发布 |
+
+## CLI
+
+```text
+shellclaw status          查看 daemon 状态
+shellclaw start           启动 daemon
+shellclaw stop            停止 daemon
+shellclaw log on|off      开启或关闭持久化文件日志
+shellclaw setup PATH      安装或刷新受管理的 Zsh Hook
+shellclaw --version       查看已安装版本
+shellclaw help            查看全部命令
+```
+
+常用环境变量：
+
+```bash
+# 自定义模型、数据库、Socket 和配置的存储目录
+export SHELLCLAW_DATA_DIR=/your/data/directory
+
+# 使用另一个兼容的 GGUF 模型
+export SHELLCLAW_MODEL_PATH=/path/to/model.gguf
+```
+
+## 从源码构建
+
+需要 Rust 1.80 或更高版本。在 macOS 上会自动启用 Metal 加速。
+
+```bash
 git clone https://github.com/Edwardd02/Shell-Claw.git
 cd Shell-Claw
 cargo build --release
+cargo test --workspace
 ```
 
----
+完整安装还需要打包的 Zsh Hook 和兼容的 GGUF 模型。Homebrew 仍然是最简单
+的完整安装方式。
 
----
+## 排查问题
 
-## 🚗 使用
-
-安装后 Homebrew 会启动 daemon 并配置 Zsh hook。**新开一个 Zsh 终端**即可获得补全。
+**没有出现补全提示**
 
 ```bash
-# 查看状态
 shellclaw status
-# → shellclaw: running
+ls ~/.shellclaw/models/*.gguf
 ```
 
-然后在 shell 里输入命令:
+安装后需要打开新的 Zsh 终端。当命令已经完整、响应已经过期，或没有可用的
+安全后缀时，ShellClaw 也会有意保持安静。
 
-```
-$ git che【光标在此,灰色提示 ckout main】
-```
-
-按 **Ctrl+Space** 或 **→** 接受,或继续打字忽略。
-
-### 常用命令
+**模型下载中断**
 
 ```bash
-shellclaw start           # 后台启动守护进程
-shellclaw stop            # 停止守护进程
-shellclaw status          # 查看是否在运行
-shellclaw log on|off      # 开启/关闭文件日志(持久化)
-shellclaw help            # 列出所有命令
+brew postinstall shellclaw
 ```
 
-### 自动加载
+下载会从临时文件继续，并在 Hugging Face 和 ModelScope 之间自动切换。
 
-安装后,**新开终端即自动加载 shell 钩子**,无需手动编辑 `.zshrc`。如需在当前
-shell 手动加载:
+**Ctrl+Space 没有传到 Zsh**
 
-```bash
-source /path/to/shellclaw.zsh     # Zsh
-# 或
-source /path/to/shellclaw.bash    # Bash（实验性）
-```
+部分 macOS 输入法切换或终端快捷键会占用 `Ctrl+Space`。取消或修改冲突的
+系统快捷键，让终端能够把 `^@` 发送给 Zsh。
 
-### 配置
+**彻底卸载**
 
 ```bash
-# ShellClaw 数据目录(默认 ~/.shellclaw)
-export SHELLCLAW_DATA_DIR=~/your/custom/dir
-
-# 模型路径(如模型下到了别处)
-export SHELLCLAW_MODEL_PATH=/path/to/your/model.gguf
-```
-
-### 卸载
-
-```bash
+shellclaw stop
 brew uninstall shellclaw
-rm -rf ~/.shellclaw    # 清空全部数据和模型(零残留)
+rm -rf ~/.shellclaw
 ```
 
----
+最后一条命令会删除下载的模型和本地命令记忆。
 
----
+## 隐私
 
-## 🚀 快速开始
+ShellClaw 从架构上坚持本地优先：
 
-打开你的终端，试着输入一个命令的开头：
+- 命令补全和模型推理在你的 Mac 上完成；
+- 命令记忆保存在 `~/.shellclaw/memory.db`；
+- 不使用遥测或托管 API；
+- 交互日志和 daemon 文件日志只有在你主动开启后才会写入。
 
-```
-$ git che【光标在此，灰色提示 ckout main】
-```
+你执行过的命令会存入本地记忆数据库，用于匹配今后的使用习惯。删除
+`~/.shellclaw` 即可清除这份记忆和全部 ShellClaw 数据。
 
-如果 ShellClaw 已经安装，灰色补全会浮现在光标右侧。按 **Ctrl+Space** 或 **右箭头** 接受，或者无视它继续打字。
-
-```bash
-# 1. 安装(见下方安装章节)
-# 2. 状态确认
-shellclaw status
-# → shellclaw: running
-
-# 3. 开一个新的 Zsh 终端,开始使用!
-```
-
-> 命令记忆会在你执行命令时自动积累——越用，补全越懂你的习惯。
-
----
-
----
-
-## ✨ 功能特性
-
-| 能力 | 说明 |
-|------|------|
-| **本地 LLM 补全** | 一个本地语言模型（llama.cpp）负责生成补全,而非固定规则——它理解 shell 命令并推断下一个词 |
-| **记忆增强** | SQLite 命令记忆按你自己真正用过的命令重排,让 LLM 更快更贴合——频率、时效、目录相关性 |
-| **Ghost Text 体验** | 灰色单行提示紧跟光标,绝不打断你的输入 |
-| **接受键** | `Ctrl+Space` 或 `右箭头` 立即接受;继续打字则无缝替换或清除 |
-| **非阻塞** | 补全请求异步进行,即便 daemon 卡死,shell 输入也完全不受影响 |
-| **静默降级** | daemon 缺失/超时/异常时,shell 自动回退原生行为,零报错、零打断 |
-| **隐私安全** | LLM + 记忆 100% 本地运行,数据绝不出机器 |
-| **Shell 支持** | Zsh 完整支持并自动配置；Bash 为实验性手动支持 |
-
----
-
----
-
-## 🏗️ 架构
-
-```
-用户键盘 → Shell Hook(zle) → Unix Socket → Rust Daemon
-                                        ↓
-              SQLite 命令记忆(FTS5) — 重排 + 个人先验
-                                        ↓
-              本地 LLM(llama.cpp) — 补全大脑
-                                        ↓
-                            返回补全后缀 → Hook 渲染 Ghost Text
-```
-
-四层显式解耦:
-
-- **Shell Hook**: 监听按键、去抖、发请求、渲染灰色补全,绝不影响 shell 主输入
-- **Rust Daemon / scheduler**: 负责 JSON-RPC、deadline、取消和 worker 调度
-- **SQLite 记忆**: 通过 `MemoryStore` Trait 提供 FTS5 快路径
-- **本地模型**: 通过 `CompletionModel` Trait 提供 llama.cpp fallback
-
-**数据流(单次补全)**:
-
-```
-你在终端输入 "git che"
-   ↓ 停止片刻(防抖)
-Hook 发送 JSON-RPC completion.request
-   ↓
-Daemon 从记忆检索相关命令(快速、个性化)
-   ↓
-记忆没有有效后缀时，本地 LLM 生成 fallback
-   ↓
-返回后缀 "ckout main" → Hook 在光标右侧渲染灰色 "ckout main"
-  按 Ctrl+Space/→ 接受, 或继续打字 清除
-```
-
----
-
----
-
-## 🛠️ CLI
-
-`shellclaw` 是一个自包含二进制,支持子命令:
-
-```bash
-shellclaw daemon          前台运行 daemon(供服务管理器调用)
-shellclaw start           后台启动 daemon
-shellclaw stop            停止 daemon
-shellclaw status          查看运行状态
-shellclaw log on|off      开启/关闭文件日志(持久化)
-shellclaw setup PATH      幂等配置 Zsh hook
-shellclaw --version       显示安装版本
-shellclaw help            帮助
-```
-
-```bash
-# 日志默认关闭(干净);诊断问题时开启
-shellclaw log on
-shellclaw start
-# → ~/.shellclaw/daemon.log 开始记录
-
-# 平时保持关闭
-shellclaw log off
-```
-
----
-
----
-
-## 🔒 隐私 & 数据安全
-
-- **纯本地**: 命令记忆(SQLite) 和 模型推理全部在机器内完成,数据绝不外传
-- **无遥测**: 不收集任何使用数据
-- **默认隐私**: 交互日志和 daemon 文件日志默认关闭，只有显式开启才记录
-- **低空闲占用**: 模型运行时空闲 30 秒后卸载，轻量 daemon 保持可用
-- **可卸载**: 删除 `~/.shellclaw/` 即可清空全部数据和配置(零残留)
-
----
-
----
-
-## ❓ FAQ
-
-**ShellClaw 到底是什么?**
-它是一个运行在你机器上的**本地大语言模型**,在你输入时补全 shell 命令。你的 SQLite 命令历史用来微调它的建议到你的习惯——既快又个人。
-
-**补全会干扰我的 shell 吗?**
-不会。补全只在光标右侧显示灰色文字,不影响已输入内容;且 daemon 完全不可用时,shell 依旧正常工作、零报错。
-
-**补全怎么学会我的命令?**
-每当你按回车执行一条命令,ShellClaw 后台记入本地记忆。LLM 会借这些记录把补全偏好到你的真实习惯——既智能(LLM) 又个人(你的历史)。一切都留在本机。
-
-**为什么有时候不显示补全?**
-- 当前命令已经完整(如已输入完整 `git commit`)
-- LLM 没把握 → 静默不提示(宁缺毋滥)
-- daemon 未运行 → hook 自动静默降级
-
-**和 zsh-autosuggestions 有什么区别?**
-zsh-autosuggestions 机械地从 shell 历史里回显单词。**ShellClaw 用一个真正的 LLM 生成补全**,它理解 shell 语义,而你的历史只用于让它更快、更贴个人。它能建议你从未输入过的命令。
-
----
-
----
-
-## 📄 License
-
-[MIT License](LICENSE) © 2026 Edwardd02
-
----
-
-欢迎使用 ShellClaw!如果它让终端用起来更顺手,给个 ⭐ 就是最好的支持。
-
-**[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[报告问题](https://github.com/Edwardd02/Shell-Claw/issues)**
+如果 ShellClaw 让你的终端更好用，欢迎给项目一个
+[Star](https://github.com/Edwardd02/Shell-Claw)，或提交包含真实使用场景的
+[Issue](https://github.com/Edwardd02/Shell-Claw/issues)。

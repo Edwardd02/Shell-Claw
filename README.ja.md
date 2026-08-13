@@ -1,279 +1,197 @@
 <div align="center">
 
-# ⚡ ShellClaw
+# ShellClaw
 
-**ローカルLLM駆動のスマート端末補完（LLM-powered Smart Terminal Completion）**
+### ターミナルで動くローカル LLM 補完
 
-### ローカル言語モデル + GitHub Copilot ライクな Ghost Text 補完。完全オンデバイスで動作
+**ShellClaw は Zsh コマンドの続きを予測し、インラインのゴーストテキスト
+として表示します。コードモデルはすべてあなたの Mac 上で動作します。**
 
-> ローカル LLM + Rust デーモン + シェルフックで、Zsh のコマンド入力を補完。
-> 軽量 SQLite のコマンド記憶があなたの習慣を学習して瞬間応答を実現。
-> ローカル言語モデル（llama.cpp）が履歴を超えてスマートに推論。データは外に出ません。
+API キー不要。クラウド推論の待ち時間なし。コマンド履歴が外部に送信される
+こともありません。
 
-**ローカルLLM &nbsp;·&nbsp; プライバシーバイデザイン &nbsp;·&nbsp; ゼロタッチ &nbsp;·&nbsp; 記憶拡張**
+[![Release](https://img.shields.io/github/v/release/Edwardd02/Shell-Claw?style=flat-square)](https://github.com/Edwardd02/Shell-Claw/releases/latest)
+[![Stars](https://img.shields.io/github/stars/Edwardd02/Shell-Claw?style=flat-square)](https://github.com/Edwardd02/Shell-Claw/stargazers)
+[![Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-black?style=flat-square&logo=apple)](https://www.apple.com/mac/)
+[![Rust](https://img.shields.io/badge/built%20with-Rust-DEA584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![macOS](https://img.shields.io/badge/macOS-✓-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
-[![Linux](https://img.shields.io/badge/Linux-開発中-8A8A8A?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
-
-**[English](README.md)** &nbsp;·&nbsp; **[简体中文](README.zh-CN.md)** &nbsp;·&nbsp; **[日本語](README.ja.md)**
-
-**[インストール](#-インストール)** &nbsp;·&nbsp; **[使い方](#-使い方)** &nbsp;·&nbsp; **[クイックスタート](#-クイックスタート)** &nbsp;·&nbsp; **[機能](#-機能)** &nbsp;·&nbsp; **[アーキテクチャ](#-アーキテクチャ)** &nbsp;·&nbsp; **[CLI](#-cli)** &nbsp;·&nbsp; **[プライバシー](#-プライバシー--データ安全性)** &nbsp;·&nbsp; **[FAQ](#-faq)**
+**[English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)**
 
 </div>
 
----
-## 📦 インストール
+## インストール
 
-### Homebrew（推奨）
+現在、ShellClaw が正式に対応している環境は **Apple Silicon Mac** と
+**Zsh** です。
 
 ```bash
 brew tap edwardd02/shellclaw
-brew trust edwardd02/shellclaw && brew install shellclaw
+brew trust edwardd02/shellclaw
+brew install shellclaw
 ```
 
-> Homebrew はデフォルトで信頼されていない tap の formula を実行しません。
-> 上記の `brew trust` を一度実行すれば解除されます。あるいは1回だけ環境変数で
-> バイパス:
-> ```bash
-> HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew install shellclaw
-> ```
+インストール時にローカルモデルをダウンロードし、`~/.zshrc` に管理可能な
+ShellClaw ブロックを追加して daemon を起動します。初回はモデルのダウンロード
+に少し時間がかかります。Hugging Face と ModelScope を測定し、速い方を優先します。
 
-`brew install` は:
-1. `shellclaw` バイナリをインストール
-2. モデルを自動で `~/.shellclaw/models/` にダウンロード —— **Hugging Face と
-   ModelScope** の両方を測速し、速い方を選択。片方が失敗しても他方に自動フェールバック
-3. `~/.zshrc` に冪等な ShellClaw ブロックを追加し、デーモンを起動
+新しいターミナルを開いて入力を始めてください：
 
-ダウンロードが中断されたら、`brew postinstall shellclaw` を再実行すれば再開します。
+```text
+$ git che[ckout main]
+         └───────── 灰色のゴーストテキスト
+```
 
-> **要件**: macOS Apple Silicon（ARM）。Linux / Intel macOS は開発中。
-
-### ソースからビルド
+**Ctrl+Space** で候補を確定します。そのまま入力を続ければ候補は置き換わるか
+無視されます。ShellClaw は `Tab` と矢印キーを占有しないため、既存のシェル補完
+とキーバインドはそのまま使えます。
 
 ```bash
-# Rust 1.80+ が必要
+shellclaw status
+# shellclaw: running
+```
+
+モデルのダウンロードが中断した場合：
+
+```bash
+brew postinstall shellclaw
+```
+
+## ShellClaw を選ぶ理由
+
+- **固定の補完表ではなく、本物のローカル LLM。** ファインチューニングした
+  Qwen2.5-Coder 0.5B が、履歴にないコマンドの続きを推論できます。
+- **データを外に出さずに個人化。** SQLite FTS5 メモリが、入力中の接頭辞と
+  カレントディレクトリを使って実際によく使うコマンドを高速に呼び戻します。
+- **シェル本来の機能のような操作感。** Zsh の `POSTDISPLAY` 経由で候補を
+  インライン表示し、確定するまで実際のコマンドバッファには入りません。
+- **入力を邪魔しない。** 非同期処理、古いリクエストのキャンセル、障害時の
+  サイレントなフォールバックにより、ターミナル入力を止めません。
+- **ローカル実行向けの設計。** llama.cpp と Apple Silicon Metal を使用し、
+  ログはデフォルトで無効、モデルは 30 秒のアイドル後にアンロードされます。
+
+## 仕組み
+
+```text
+Zsh 入力
+   │
+   ▼
+ShellClaw ZLE Hook ── ローカル Unix Socket 上の JSON-RPC ──▶ Rust daemon
+                                                            │
+                                       ┌────────────────────┴──────────────────┐
+                                       ▼                                       ▼
+                             SQLite FTS5 メモリ                     ローカル Qwen2.5-Coder
+                             高速な個人化検索                       llama.cpp + Metal
+                                       └────────────────────┬──────────────────┘
+                                                            ▼
+                                                    検証済みの補完 suffix
+                                                            │
+                                                            ▼
+                                                  Zsh の灰色ゴーストテキスト
+```
+
+daemon は最初にローカルのコマンドメモリを検索し、有効な一致がない場合にモデル
+が suffix を生成します。Hook は現在のコマンド行に対する最新の応答だけを受け入れ、
+`Ctrl+Space` を押すまでは候補と実入力を分離します。
+
+## 現在の実装
+
+| 項目 | 実装 |
+|---|---|
+| モデル | ファインチューニング済み Qwen2.5-Coder 0.5B、GGUF 形式 |
+| 推論 | llama.cpp、Apple Silicon では Metal アクセラレーション |
+| 個人メモリ | ローカル SQLite データベース + FTS5 検索 |
+| UI | Zsh ネイティブのインライン表示、`Ctrl+Space` で確定 |
+| ランタイム | ローカル Unix Socket で通信する Rust daemon |
+| プライバシー | オンデバイス推論、テレメトリなし、ファイルログはデフォルト無効 |
+| リソース | モデルは 30 秒のアイドル後にアンロード |
+| 正式対応 | macOS Apple Silicon + Zsh |
+| 実験的 | Bash Hook。Linux と Intel macOS は未リリース |
+
+## CLI
+
+```text
+shellclaw status          daemon の状態を表示
+shellclaw start           daemon を起動
+shellclaw stop            daemon を停止
+shellclaw log on|off      永続ファイルログを有効・無効化
+shellclaw setup PATH      管理対象の Zsh Hook を設定・更新
+shellclaw --version       インストール済みバージョンを表示
+shellclaw help            全コマンドを表示
+```
+
+主な環境変数：
+
+```bash
+# モデル、DB、Socket、設定の保存先を変更
+export SHELLCLAW_DATA_DIR=/your/data/directory
+
+# 別の互換 GGUF モデルを使用
+export SHELLCLAW_MODEL_PATH=/path/to/model.gguf
+```
+
+## ソースからビルド
+
+Rust 1.80 以降が必要です。macOS では Metal が自動的に有効になります。
+
+```bash
 git clone https://github.com/Edwardd02/Shell-Claw.git
 cd Shell-Claw
 cargo build --release
+cargo test --workspace
 ```
 
----
+完全なインストールには、パッケージされた Zsh Hook と互換 GGUF モデルも必要です。
+一式を導入する最も簡単な方法は Homebrew です。
 
----
+## トラブルシューティング
 
-## 🚗 使い方
-
-Homebrew はデーモンを起動し、Zsh フックを自動設定します。
-**新しい Zsh ターミナル**を開けば補完が使えます。
+**候補が表示されない**
 
 ```bash
-# 状態を確認
 shellclaw status
-# → shellclaw: running
+ls ~/.shellclaw/models/*.gguf
 ```
 
-シェルにコマンドを入力してください：
+インストール後は新しい Zsh ターミナルを開いてください。コマンドがすでに完成
+している、応答が古い、安全な suffix がない場合も、ShellClaw は意図的に何も
+表示しません。
 
-```
-$ git che【カーソル位置、灰色のヒント: ckout main】
-```
-
-**Ctrl+Space** または **→** で確定、打ち続けて無視します。
-
-### 主なコマンド
+**モデルのダウンロードが止まった**
 
 ```bash
-shellclaw start           # デーモンをバックグラウンド起動
-shellclaw stop            # デーモンを停止
-shellclaw status          # 起動状態を確認
-shellclaw log on|off      # ファイルログ有効/無効（永続化）
-shellclaw help            # 全コマンドを表示
+brew postinstall shellclaw
 ```
 
-### 自動ロード
+一時ファイルから再開し、Hugging Face と ModelScope を自動的に切り替えます。
 
-インストール後、**新しいターミナルで自動的にシェルフックが読み込まれ**、
-手動で `.zshrc` を編集する必要はありません。現在のシェルに手動で読み込む場合:
+**Ctrl+Space が Zsh に届かない**
 
-```bash
-source /path/to/shellclaw.zsh     # Zsh
-# または
-source /path/to/shellclaw.bash    # Bash（実験的）
-```
+macOS の入力ソース切り替えやターミナルのショートカットが `Ctrl+Space` を
+使用している場合があります。競合する設定を解除または変更し、ターミナルから
+`^@` が Zsh に送られるようにしてください。
 
-### 設定
+**完全にアンインストールする**
 
 ```bash
-# ShellClaw データディレクトリ（デフォルト ~/.shellclaw）
-export SHELLCLAW_DATA_DIR=~/your/custom/dir
-
-# モデルパス（別の場所にモデルを置いた場合）
-export SHELLCLAW_MODEL_PATH=/path/to/your/model.gguf
-```
-
-### アンインストール
-
-```bash
+shellclaw stop
 brew uninstall shellclaw
-rm -rf ~/.shellclaw    # 全データ・モデルを削除（残骸ゼロ）
+rm -rf ~/.shellclaw
 ```
 
----
+最後のコマンドで、ダウンロードしたモデルとローカルコマンドメモリを削除します。
 
----
+## プライバシー
 
-## 🚀 クイックスタート
+ShellClaw はアーキテクチャからローカルファーストです：
 
-ターミナルを開いて、コマンドの先頭を入力してみてください：
+- コマンド補完とモデル推論は Mac 上で実行されます。
+- コマンドメモリは `~/.shellclaw/memory.db` に保存されます。
+- テレメトリやホスト型 API は使用しません。
+- 対話ログと daemon のファイルログは、明示的に有効にした場合だけ記録されます。
 
-```
-$ git che【カーソル位置、灰色のヒント: ckout main】
-```
+実行したコマンドは、今後の候補を利用習慣に合わせるためローカルメモリ DB に
+保存されます。`~/.shellclaw` を削除すれば、メモリを含む全データを消去できます。
 
-ShellClaw がインストールされていれば、カーソルの右に灰色の補完が表示されます。**Ctrl+Space** または **→** で確定するか、そのまま打ち続けて無視します。
-
-```bash
-# 1. インストール（下記インストール節を参照）
-# 2. 状態を確認
-shellclaw status
-# → shellclaw: running
-
-# 3. 新しい Zsh ターミナルを開いて使い始めましょう！
-```
-
-> コマンドを実行するたびに記憶が自動で蓄積されます。使うほど補完があなたの習慣を理解します。
-
----
-
----
-
-## ✨ 機能
-
-| 機能 | 説明 |
-|------|------|
-| **ローカル LLM 補完** | ローカル言語モデル（llama.cpp）が補完を生成。固定ルールではなく、シェルコマンドを理解して次の語を推論 |
-| **記憶拡張** | SQLite コマンド記憶があなたの実際の使用に基づいて提案を再ランキングし、LLM を高速・関連性高く保つ（頻度・最近性・cwd） |
-| **ゴーストテキスト UX** | カーソルの直後に灰色の一行ヒントを表示。入力は妨げません |
-| **確定キー** | `Ctrl+Space` または `→` で即時に確定。打ち続けると自然に置き換わります |
-| **非ブロッキング** | 補完は非同期実行。デーモンが固まってもシェル入力は影響を受けません |
-| **サイレントダウングレード** | デーモンが不在・遅延・異常時もシェルはネイティブ動作に自動フォールバック。エラー・中断は一切なし |
-| **プライバシー** | LLM + 記憶は 100% オンデバイス。データがマシンを出ることはありません |
-| **シェル対応** | Zsh は完全対応・自動設定。Bash は実験的な手動対応 |
-
----
-
----
-
-## 🏗️ アーキテクチャ
-
-```
-キー入力 → Shell Hook(zle) → Unix Socket → Rust Daemon
-                                        ↓
-                  SQLite コマンド記憶(FTS5) — 再ランキング + 個人先験
-                                        ↓
-                  ローカル LLM(llama.cpp) — 補完の頭脳
-                                        ↓
-                            補完サフィックスを返す → Hook がゴーストテキストを描画
-```
-
-明示的に分離された4層構造:
-
-- **Shell Hook**: キー監視・デバウンス・リクエスト送信・灰色補完の描画。シェルの主入力には一切触れません
-- **Rust Daemon / scheduler**: JSON-RPC、deadline、キャンセル、worker dispatch を担当
-- **SQLite 記憶**: `MemoryStore` Trait の背後にある FTS5 高速パス
-- **ローカルモデル**: `CompletionModel` Trait の背後にある llama.cpp fallback
-
-**データフロー（1回の補完）**:
-
-```
-ターミナルで "git che" と入力
-   ↓ 少し停止（デバウンス）
-Hook が JSON-RPC completion.request を送信
-   ↓
-Daemon が記憶から関連コマンドを取得（高速・個人化）
-   ↓
-記憶に有効な suffix がなければローカル LLM が fallback を生成
-   ↓
-サフィックス "ckout main" を返す → Hook がカーソル右に灰色 "ckout main" を描画
-  Ctrl+Space/→ で確定、または打ち続けてクリア
-```
-
----
-
----
-
-## 🛠️ CLI
-
-`shellclaw` は単一の自己完結バイナリで、サブコマンドを提供します:
-
-```bash
-shellclaw daemon          デーモンをフォアグラウンドで実行（サービス管理用）
-shellclaw start           デーモンをバックグラウンドで起動
-shellclaw stop            デーモンを停止
-shellclaw status          実行状態を表示
-shellclaw log on|off      ファイルログを有効/無効化（永続化）
-shellclaw setup PATH      Zsh フックを冪等に設定
-shellclaw --version       インストール済みバージョンを表示
-shellclaw help            ヘルプを表示
-```
-
-```bash
-# ログはデフォルトでオフ（クリーン）。診断時に有効化:
-shellclaw log on
-shellclaw start
-# → ~/.shellclaw/daemon.log に記録開始
-
-# 日常利用ではオフのまま
-shellclaw log off
-```
-
----
-
----
-
-## 🔒 プライバシー & データ安全性
-
-- **完全ローカル**: コマンド記憶（SQLite）とモデル推論はすべてマシン内で完結。外部送信は一切なし
-- **テレメトリなし**: 使用データは収集しません
-- **デフォルトで非記録**: 対話ログとデーモンファイルログは明示的に有効化しない限り無効
-- **低いアイドル負荷**: 30 秒のアイドル後にモデルをアンロードし、軽量デーモンだけを維持
-- **完全削除可能**: `~/.shellclaw/` を削除すれば全データと設定がクリアされます（残骸ゼロ）
-
----
-
----
-
-## ❓ FAQ
-
-**ShellClaw とは実際何?**
-あなたのマシン上で動作する**ローカル言語モデル**が、入力時にシェルコマンドを補完します。あなたの SQLite コマンド履歴が LLM の提案をあなたの習慣に合わせ、高速かつ個人的にします。
-
-**補完はシェルを妨げますか?**
-いいえ。補完はカーソル右のグレー文字としてのみ表示され、入力内容には影響しません。デーモンが完全に使えなくても、シェルはエラーなく正常動作します。
-
-**ShellClaw はどうやってコマンドを学習するの?**
-実行したすべてのコマンドがローカル記憶に記録されます。LLM はその記録を使って、提案をあなたの実際の行動に寄せます。スマート（LLM）かつ個人的（あなたの履歴）です。すべてマシン内に留まります。
-
-**なぜ補完が表示されないことがあるの?**
-- コマンドがすでに完了している場合（例: `git commit` を完全に入力済み）
-- LLM に確信がない場合 → 静かに非表示（間違いより無表示を優先）
-- デーモンが起動していない場合 → フックが自動でサイレントダウングレード
-
-**zsh-autosuggestions との違いは?**
-zsh-autosuggestions はシェル履歴から機械的に単語をリピートします。**ShellClaw は本物の LLM で補完を生成**し、シェルの意味を理解します。あなたの履歴は LLM を高速・個人的にするためにのみ使われます。一度も入力したことのないコマンドも提案できます。
-
----
-
----
-
-## 📄 ライセンス
-
-[MIT License](LICENSE) © 2026 Edwardd02
-
----
-
-ShellClaw をありがとうございます。ターミナルが使いやすくなったら、スターが最高の応援になります。
-
-**[⭐ Star on GitHub](https://github.com/Edwardd02/Shell-Claw)** &nbsp;·&nbsp; **[Issue を報告](https://github.com/Edwardd02/Shell-Claw/issues)**
+ShellClaw がターミナルを便利にしたら、プロジェクトへの
+[Star](https://github.com/Edwardd02/Shell-Claw) や、実際の利用例を含む
+[Issue](https://github.com/Edwardd02/Shell-Claw/issues) を歓迎します。

@@ -38,7 +38,7 @@ SHELLCLAW_ZSH_TESTING=1 zsh -f -c '
     _ssc_init
     [[ "$(bindkey "^@")" == *" _ssc_accept_ctrl_space" ]]
     [[ "$(bindkey "^I")" == *" expand-or-complete" ]]
-    [[ "$(bindkey "^[[C")" == *" _ssc_accept_right_arrow" ]]
+    [[ "$(bindkey "^[[C")" == *" forward-char" ]]
 ' sh "$TMP/shellclaw.zsh"
 bash -n "$TMP/shellclaw.bash"
 sh -n "$TMP/scripts/download-model.sh"
