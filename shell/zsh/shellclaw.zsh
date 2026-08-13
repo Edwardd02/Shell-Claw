@@ -10,7 +10,14 @@ fi
 typeset -g _SHELLCLAW_ZSH_LOADED=1
 
 SSC_SOCKET="${SSC_SOCKET:-${SHELLCLAW_DATA_DIR:-$HOME/.shellclaw}/daemon.sock}"
-SSC_DEADLINE_MS="${SSC_DEADLINE_MS:-250}"
+SSC_DEADLINE_MS="${SSC_DEADLINE_MS:-1500}"
+
+_ssc_now_ms() {
+    zmodload zsh/datetime 2>/dev/null
+    local now
+    printf -v now '%.0f' "$(( EPOCHREALTIME * 1000 ))"
+    print -r -- "$now"
+}
 
 # ---- 调试日志 ----
 # SSC_DEBUG=1 时,把 hook 发出的每个请求和收到的每个响应都追加到
@@ -45,6 +52,7 @@ typeset -gHi _ssc_fd=-1
 typeset -g _ssc_original_self_insert="_ssc_original_self_insert"
 typeset -g _ssc_original_tab="expand-or-complete"
 typeset -g _ssc_original_right="forward-char"
+typeset -gA _ssc_edit_originals
 
 # 追加一行到 hook 日志(仅 SSC_DEBUG=1 时)。
 _ssc_log() {
@@ -123,8 +131,7 @@ _ssc_request() {
     local cursor="${CURSOR:-0}"
     local cwd="${PWD}"
     local now
-    zmodload zsh/datetime 2>/dev/null
-    now=$(( EPOCHREALTIME * 1000 ))
+    now="$(_ssc_now_ms)"
 
     local payload
     local escaped_line escaped_cwd
@@ -184,7 +191,7 @@ _ssc_handle_response() {
     _ssc_suggestion="$suffix"
     _ssc_log "RENDER(hook) suffix=${suffix}"
     _ssc_log_interaction "OUTPUT" "$suffix"
-    _ssc_render_suggestion
+    zle _ssc_apply_suggestion 2>/dev/null || _ssc_clear_suggestion
 }
 
 # 拼接 base + suggestion,避免双空格:
@@ -202,7 +209,7 @@ _ssc_join_suggestion() {
 _ssc_render_suggestion() {
     local n=${#_ssc_suggestion}
     if (( n > 0 )) && [[ -n "$_ssc_suggestion" ]]; then
-        [[ "$BUFFER" == "$_ssc_req_line" && CURSOR == ${#BUFFER} ]] || {
+        [[ "$BUFFER" == "$_ssc_req_line" ]] && (( CURSOR == ${#BUFFER} )) || {
             _ssc_clear_suggestion
             return
         }
@@ -217,6 +224,10 @@ _ssc_render_suggestion() {
     fi
 }
 
+_ssc_apply_suggestion() {
+    _ssc_render_suggestion
+}
+
 _ssc_clear_suggestion() {
     _ssc_suggestion=""
     POSTDISPLAY=""
@@ -224,17 +235,38 @@ _ssc_clear_suggestion() {
     zle -R 2>/dev/null || true
 }
 
-_ssc_self_insert() {
-    zle "$_ssc_original_self_insert"
+_ssc_after_buffer_edit() {
     _ssc_clear_suggestion
-
-    if [[ -n "$BUFFER" ]] && [[ "$BUFFER" =~ [^[:space:]] ]]; then
+    if [[ -n "$BUFFER" && "$BUFFER" =~ [^[:space:]] ]] && (( CURSOR == ${#BUFFER} )); then
         _ssc_request
+    else
+        _ssc_active_request_id=""
+        _ssc_req_line=""
     fi
 }
 
+_ssc_self_insert() {
+    zle "$_ssc_original_self_insert"
+    _ssc_after_buffer_edit
+}
+
+_ssc_edit_buffer() {
+    local original="${_ssc_edit_originals[$WIDGET]:-}"
+    [[ -n "$original" ]] || return 1
+    zle "$original"
+    _ssc_after_buffer_edit
+}
+
+_ssc_wrap_edit_widget() {
+    local widget="$1"
+    local original="_ssc_original_${widget//-/_}"
+    zle -A "$widget" "$original" 2>/dev/null || return 0
+    _ssc_edit_originals[$widget]="$original"
+    zle -N "$widget" _ssc_edit_buffer
+}
+
 _ssc_accept() {
-    if [[ -n "$_ssc_suggestion" && "$BUFFER" == "$_ssc_req_line" && CURSOR == ${#BUFFER} ]]; then
+    if [[ -n "$_ssc_suggestion" && "$BUFFER" == "$_ssc_req_line" ]] && (( CURSOR == ${#BUFFER} )); then
         BUFFER="$(_ssc_join_suggestion "$BUFFER" "$_ssc_suggestion")"
         CURSOR=${#BUFFER}
         # 接受后失效所有在途请求:若之前请求的响应晚到,_ssc_active_request_id
@@ -265,10 +297,26 @@ _ssc_init() {
     _ssc_original_tab="${${(z)tab_binding}[2]:-expand-or-complete}"
     _ssc_original_right="${${(z)right_binding}[2]:-forward-char}"
     zle -N self-insert _ssc_self_insert
+    zle -N _ssc_apply_suggestion _ssc_apply_suggestion
     zle -N _ssc_accept_tab _ssc_accept_tab
     zle -N _ssc_accept_right_arrow _ssc_accept_right_arrow
     bindkey '^I' _ssc_accept_tab
     bindkey '^[[C' _ssc_accept_right_arrow
+
+    local edit_widget
+    for edit_widget in \
+        backward-delete-char \
+        delete-char-or-list \
+        backward-kill-word \
+        kill-word \
+        kill-line \
+        kill-whole-line \
+        vi-backward-delete-char \
+        vi-delete-char \
+        vi-backward-kill-word \
+        vi-kill-line; do
+        _ssc_wrap_edit_widget "$edit_widget"
+    done
 
     _ssc_open_socket || {
         command -v shellclaw >/dev/null 2>&1 && shellclaw start >/dev/null 2>&1 &!
@@ -295,4 +343,6 @@ _ssc_record_command() {
     } &!
 }
 
-_ssc_init
+if [[ "${SHELLCLAW_ZSH_TESTING:-0}" != "1" ]]; then
+    _ssc_init
+fi
