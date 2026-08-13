@@ -82,7 +82,7 @@ Then type a command in your shell:
 $ git che【cursor here, gray hint: ckout main】
 ```
 
-Press **Tab** or **→** to accept, or keep typing to ignore.
+Press **Ctrl+Space** or **→** to accept, or keep typing to ignore.
 
 ### Common commands
 
@@ -149,7 +149,7 @@ Open a new terminal and type a command:
 $ git che【cursor here, gray hint: ckout main】
 ```
 
-The gray completion appears right of the cursor. Press **Tab** or **→** to
+The gray completion appears right of the cursor. Press **Ctrl+Space** or **→** to
 accept, or just keep typing to ignore it.
 
 > Command memory is accumulated automatically as you run commands — the more
@@ -166,7 +166,7 @@ accept, or just keep typing to ignore it.
 | **Local LLM completion** | A local language model (via llama.cpp) generates the completion, not a fixed rule — it understands shell commands and infers the next words |
 | **Memory-augmented** | Your SQLite command memory ranks suggestions by what *you* actually run, keeping the LLM fast and relevant — frequency, recency, cwd |
 | **Ghost text UX** | A gray single-line hint right after the cursor, never disrupting your typing |
-| **Accept keys** | `Tab` or `→` accepts instantly; keep typing to replace or clear seamlessly |
+| **Accept keys** | `Ctrl+Space` or `→` accepts instantly; keep typing to replace or clear seamlessly |
 | **Non-blocking** | Completions run asynchronously — even if the daemon hangs, your shell input is unaffected |
 | **Silent degradation** | When the daemon is missing, slow, or errors, the shell falls back to native behavior — zero errors, zero interruption |
 | **Privacy** | LLM + memory run 100% on-device; nothing ever leaves your machine |
@@ -207,7 +207,7 @@ Daemon retrieves relevant commands from memory (fast, personalized)
 If memory has no valid suffix, the local LLM generates a fallback
    ↓
 Return suffix "ckout main" → Hook renders gray "ckout main" right of cursor
-  press Tab/→ to accept, or keep typing to clear
+  press Ctrl+Space/→ to accept, or keep typing to clear
 ```
 
 ---
