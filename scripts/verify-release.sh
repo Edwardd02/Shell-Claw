@@ -34,6 +34,11 @@ SHELLCLAW_ZSH_TESTING=1 zsh -f -c '
     _ssc_after_buffer_edit
     [[ -z "$_ssc_suggestion" && -z "$POSTDISPLAY" ]]
     [[ "$test_request_line" == "shellclaw s" ]]
+    _ssc_open_socket() { return 0; }
+    _ssc_init
+    [[ "$(bindkey "^@")" == *" _ssc_accept_ctrl_space" ]]
+    [[ "$(bindkey "^I")" == *" expand-or-complete" ]]
+    [[ "$(bindkey "^[[C")" == *" _ssc_accept_right_arrow" ]]
 ' sh "$TMP/shellclaw.zsh"
 bash -n "$TMP/shellclaw.bash"
 sh -n "$TMP/scripts/download-model.sh"
