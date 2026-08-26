@@ -468,7 +468,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -616,7 +616,7 @@ dependencies = [
 
 [[package]]
 name = "shellclaw"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "encoding_rs",
  "llama-cpp-2",

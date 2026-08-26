@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+## 0.0.3 - 2026-08-26
+
 - Accept Zsh and experimental Bash ghost text with Right Arrow, leave `Tab`
   exclusively to native shell completion, and avoid the macOS `Ctrl+Space`
   input-source shortcut conflict.
+- Clear stale ghost text before Zsh native completion, invalidate in-flight
+  suggestions, and repair legacy `Tab` bindings when reloading an open shell.
 
 ## 0.0.2 - 2026-08-12
 

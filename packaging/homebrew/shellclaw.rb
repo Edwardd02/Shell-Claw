@@ -1,13 +1,13 @@
 class Shellclaw < Formula
   desc "Local-first LLM-powered shell completion copilot"
   homepage "https://github.com/Edwardd02/Shell-Claw"
-  version "0.0.2"
+  version "0.0.3"
 
   if OS.mac? && Hardware::CPU.arm?
-    url "https://github.com/Edwardd02/Shell-Claw/releases/download/v0.0.2/shellclaw-aarch64-apple-darwin.tar.gz"
-    sha256 "e68d3247c2365b53c9c2cb31689bd373602ea3f24e4176a14284903b4ebcc698"
+    url "https://github.com/Edwardd02/Shell-Claw/releases/download/v0.0.3/shellclaw-aarch64-apple-darwin.tar.gz"
+    sha256 "8dd992dbfb1c00094bb22e95adbcb3eeb62899b9d279eb10c8311b05eb218f90"
   else
-    odie "ShellClaw v0.0.2 currently supports Apple Silicon only"
+    odie "ShellClaw v0.0.3 currently supports Apple Silicon only"
   end
 
   def install
