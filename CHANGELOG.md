@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Accept Zsh and experimental Bash ghost text with Right Arrow, leave `Tab`
+  exclusively to native shell completion, and avoid the macOS `Ctrl+Space`
+  input-source shortcut conflict.
+
 ## 0.0.2 - 2026-08-12
 
 - Make completion, cancellation, SQLite retrieval, and llama.cpp inference run

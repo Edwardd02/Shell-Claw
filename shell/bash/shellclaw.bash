@@ -74,23 +74,13 @@ _ssc_clear_suggestion() {
     _ssc_active_request_id=""
 }
 
-_ssc_accept_tab() {
-    if [[ -n "$_ssc_suggestion" ]]; then
-        READLINE_LINE="${READLINE_LINE}${_ssc_suggestion}"
-        READLINE_POINT=${#READLINE_LINE}
-        _ssc_clear_suggestion
-    else
-        bind '"\C-i": complete' 2>/dev/null
-    fi
-}
-
 _ssc_accept_right() {
-    if [[ -n "$_ssc_suggestion" ]]; then
+    if [[ -n "$_ssc_suggestion" ]] && (( READLINE_POINT == ${#READLINE_LINE} )); then
         READLINE_LINE="${READLINE_LINE}${_ssc_suggestion}"
         READLINE_POINT=${#READLINE_LINE}
         _ssc_clear_suggestion
-    else
-        bind '"\e[C": forward-char' 2>/dev/null
+    elif (( READLINE_POINT < ${#READLINE_LINE} )); then
+        READLINE_POINT=$(( READLINE_POINT + 1 ))
     fi
 }
 
@@ -110,9 +100,7 @@ _ssc_bind_key_handler() {
 }
 
 if _ssc_probe; then
-    bind -x '"\C-i": _ssc_accept_tab' 2>/dev/null
     bind -x '"\e[C": _ssc_accept_right' 2>/dev/null
-    bind 'set show-all-if-ambiguous on' 2>/dev/null
 
     _ssc_record_command() {
         _ssc_probe || return

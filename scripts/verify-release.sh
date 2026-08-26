@@ -36,10 +36,25 @@ SHELLCLAW_ZSH_TESTING=1 zsh -f -c '
     [[ "$test_request_line" == "shellclaw s" ]]
     _ssc_open_socket() { return 0; }
     _ssc_init
-    [[ "$(bindkey "^@")" == *" _ssc_accept_ctrl_space" ]]
+    [[ "$(bindkey "^[[C")" == *" _ssc_accept_right_arrow" ]]
     [[ "$(bindkey "^I")" == *" expand-or-complete" ]]
-    [[ "$(bindkey "^[[C")" == *" forward-char" ]]
+    [[ "$(bindkey "^@")" != *"_ssc_"* ]]
 ' sh "$TMP/shellclaw.zsh"
 bash -n "$TMP/shellclaw.bash"
+bash --noprofile --norc -c '
+    source "$1"
+    READLINE_LINE="shellclaw st"
+    READLINE_POINT=${#READLINE_LINE}
+    _ssc_suggestion="atus"
+    _ssc_accept_right
+    [[ "$READLINE_LINE" == "shellclaw status" ]]
+    [[ "$READLINE_POINT" -eq ${#READLINE_LINE} ]]
+    READLINE_LINE="abc"
+    READLINE_POINT=1
+    _ssc_suggestion="ignored"
+    _ssc_accept_right
+    [[ "$READLINE_LINE" == "abc" && "$READLINE_POINT" -eq 2 ]]
+' sh "$TMP/shellclaw.bash"
+! grep -F '\C-i' "$TMP/shellclaw.bash" >/dev/null
 sh -n "$TMP/scripts/download-model.sh"
 echo "release archive verified"

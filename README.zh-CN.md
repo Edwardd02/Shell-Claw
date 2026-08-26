@@ -39,8 +39,8 @@ $ git che[ckout main]
          └───────── 灰色 Ghost Text
 ```
 
-按 **Ctrl+Space** 接受提示；继续输入则替换或忽略它。ShellClaw 不占用
-`Tab` 和方向键，原有的 Shell 补全和快捷键可以照常使用。
+按 **右方向键** 接受提示；继续输入则替换或忽略它。ShellClaw 不占用
+`Tab`，原有的 Shell 补全可以照常使用。
 
 ```bash
 shellclaw status
@@ -87,7 +87,7 @@ ShellClaw ZLE Hook ── 本地 Unix Socket 上的 JSON-RPC ──▶ Rust Daem
 ```
 
 daemon 会先查询本地命令记忆；没有有效匹配时，再由模型生成补全后缀。Hook
-只接受当前命令行最新一次请求的结果，并在你按下 `Ctrl+Space` 前始终把提示
+只接受当前命令行最新一次请求的结果，并在你按下`右方向键`前始终把提示
 与真实输入分开。
 
 ## 项目实况
@@ -97,7 +97,7 @@ daemon 会先查询本地命令记忆；没有有效匹配时，再由模型生�
 | 模型 | 微调 Qwen2.5-Coder 0.5B，GGUF 格式 |
 | 推理 | llama.cpp，Apple Silicon 上使用 Metal 加速 |
 | 个性化记忆 | 本地 SQLite 数据库 + FTS5 检索 |
-| 交互 | Zsh 原生内联灰字；`Ctrl+Space` 接受 |
+| 交互 | Zsh 原生内联灰字；`右方向键`接受 |
 | 运行方式 | Rust daemon，通过本地 Unix Socket 通信 |
 | 隐私 | 本地推理、无遥测、文件日志默认关闭 |
 | 资源占用 | 模型空闲 30 秒后卸载，轻量 daemon 保持可用 |
@@ -160,10 +160,10 @@ brew postinstall shellclaw
 
 下载会从临时文件继续，并在 Hugging Face 和 ModelScope 之间自动切换。
 
-**Ctrl+Space 没有传到 Zsh**
+**升级后 Tab 仍会接受 ShellClaw 提示**
 
-部分 macOS 输入法切换或终端快捷键会占用 `Ctrl+Space`。取消或修改冲突的
-系统快捷键，让终端能够把 `^@` 发送给 Zsh。
+旧版 Hook 使用 `Tab` 接受提示。升级后请打开一个新的终端窗口，让 Zsh 加载
+新版 Hook；此后 `Tab` 将只用于原生补全。
 
 **彻底卸载**
 

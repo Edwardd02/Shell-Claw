@@ -43,8 +43,8 @@ class Shellclaw < Formula
       ShellClaw has been installed.
 
       The Zsh hook was added to ~/.zshrc and the daemon was started.
-      Open a new terminal, or enable the current Zsh session now:
-        source #{opt_share}/shellclaw/shellclaw.zsh
+      Open a new terminal to load the Zsh hook. This is required after an
+      upgrade so the old session does not retain outdated key bindings.
 
       Bash support is experimental and is not enabled automatically.
 

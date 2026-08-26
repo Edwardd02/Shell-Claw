@@ -39,9 +39,8 @@ $ git che[ckout main]
          └───────── gray ghost text
 ```
 
-Press **Ctrl+Space** to accept the suggestion. Keep typing to replace it or
-ignore it. ShellClaw leaves `Tab` and the arrow keys to your existing shell
-bindings.
+Press **Right Arrow** to accept the suggestion. Keep typing to replace it or
+ignore it. ShellClaw leaves `Tab` to your existing shell completion.
 
 ```bash
 shellclaw status
@@ -92,7 +91,7 @@ ShellClaw ZLE hook ── JSON-RPC over a local Unix socket ──▶ Rust daemo
 The daemon checks local command memory first. When memory has no valid match,
 the model generates a suffix. The hook accepts only the newest response for the
 current command line, validates it, and keeps the suggestion separate from your
-real input until you press `Ctrl+Space`.
+real input until you press `Right Arrow`.
 
 ## What You Get
 
@@ -101,7 +100,7 @@ real input until you press `Ctrl+Space`.
 | Model | Fine-tuned Qwen2.5-Coder 0.5B in GGUF format |
 | Inference | llama.cpp with Metal acceleration on Apple Silicon |
 | Personal memory | Local SQLite database with FTS5 retrieval |
-| Interface | Native inline Zsh ghost text; `Ctrl+Space` to accept |
+| Interface | Native inline Zsh ghost text; `Right Arrow` to accept |
 | Runtime | Rust daemon communicating over a local Unix socket |
 | Privacy | On-device inference, no telemetry, file logging disabled by default |
 | Resource use | Heavy model state unloads after 30 idle seconds |
@@ -167,10 +166,10 @@ brew postinstall shellclaw
 Downloads resume from the partial file and automatically fall back between
 Hugging Face and ModelScope.
 
-**Ctrl+Space does not reach Zsh**
+**Tab still accepts ShellClaw suggestions after upgrading**
 
-Some macOS input-source or terminal shortcuts capture `Ctrl+Space`. Remove or
-rebind that conflicting shortcut so the terminal can send `^@` to Zsh.
+The previous hook used `Tab`. Open a new terminal after upgrading so Zsh loads
+the new hook; `Tab` will then remain exclusively available to native completion.
 
 **Remove ShellClaw completely**
 
