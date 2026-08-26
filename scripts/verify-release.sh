@@ -34,11 +34,38 @@ SHELLCLAW_ZSH_TESTING=1 zsh -f -c '
     _ssc_after_buffer_edit
     [[ -z "$_ssc_suggestion" && -z "$POSTDISPLAY" ]]
     [[ "$test_request_line" == "shellclaw s" ]]
+    function zle { test_zle_call="$*"; }
+    WIDGET="expand-or-complete"
+    _ssc_edit_originals[$WIDGET]="_ssc_original_expand_or_complete"
+    _ssc_active_request_id="request-in-flight"
+    _ssc_req_line="$BUFFER"
+    _ssc_suggestion="stale"
+    POSTDISPLAY="stale"
+    test_request_line="unchanged"
+    _ssc_complete_buffer
+    [[ "$test_zle_call" == "_ssc_original_expand_or_complete" ]]
+    [[ "$test_request_line" == "unchanged" ]]
+    [[ -z "$_ssc_active_request_id" && -z "$_ssc_req_line" ]]
+    [[ -z "$_ssc_suggestion" && -z "$POSTDISPLAY" ]]
+    unfunction zle
     _ssc_open_socket() { return 0; }
     _ssc_init
     [[ "$(bindkey "^[[C")" == *" _ssc_accept_right_arrow" ]]
     [[ "$(bindkey "^I")" == *" expand-or-complete" ]]
     [[ "$(bindkey "^@")" != *"_ssc_"* ]]
+    for widget in expand-or-complete complete-word menu-complete reverse-menu-complete; do
+        [[ "$(zle -l -L "$widget")" == *"_ssc_complete_buffer"* ]]
+        zle -A "${_ssc_edit_originals[$widget]}" "$widget"
+    done
+    zle -N _ssc_accept_tab _ssc_accept_right_arrow
+    typeset -g _ssc_original_tab="expand-or-complete"
+    bindkey "^I" _ssc_accept_tab
+    source "$1"
+    [[ "$(bindkey "^I")" == *" expand-or-complete" ]]
+    [[ "$(bindkey "^I")" != *" _ssc_accept_tab" ]]
+    for widget in expand-or-complete complete-word menu-complete reverse-menu-complete; do
+        [[ "$(zle -l -L "$widget")" == *"_ssc_complete_buffer"* ]]
+    done
 ' sh "$TMP/shellclaw.zsh"
 bash -n "$TMP/shellclaw.bash"
 bash --noprofile --norc -c '

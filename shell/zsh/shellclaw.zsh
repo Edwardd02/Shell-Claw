@@ -4,6 +4,49 @@
 # handling inside the zle event loop. Silently no-ops if the daemon socket is
 # unavailable.
 
+_ssc_complete_buffer() {
+    local original="${_ssc_edit_originals[$WIDGET]:-}"
+    [[ -n "$original" ]] || return 1
+    _ssc_active_request_id=""
+    _ssc_req_line=""
+    _ssc_clear_suggestion
+    zle "$original"
+}
+
+_ssc_wrap_completion_widget() {
+    local widget="$1"
+    local original="_ssc_original_${widget//-/_}"
+    zle -A "$widget" "$original" 2>/dev/null || return 0
+    _ssc_edit_originals[$widget]="$original"
+    zle -N "$widget" _ssc_complete_buffer
+}
+
+_ssc_upgrade_loaded_hook() {
+    local tab_binding
+    tab_binding="$(bindkey '^I' 2>/dev/null)"
+    if [[ "$tab_binding" == *" _ssc_accept_tab" ]]; then
+        bindkey '^I' "${_ssc_original_tab:-expand-or-complete}"
+    fi
+
+    [[ -n "${_SHELLCLAW_ZSH_LOADED:-}" ]] || return 0
+
+    typeset -gA _ssc_edit_originals
+    local completion_widget definition
+    for completion_widget in \
+        expand-or-complete \
+        complete-word \
+        menu-complete \
+        reverse-menu-complete; do
+        definition="$(zle -l -L "$completion_widget" 2>/dev/null)"
+        [[ "$definition" == *"_ssc_complete_buffer"* ]] || \
+            _ssc_wrap_completion_widget "$completion_widget"
+    done
+}
+
+# This must run before the load guard so re-sourcing upgrades an open shell
+# without re-wrapping self-insert and the other already-initialized widgets.
+_ssc_upgrade_loaded_hook
+
 if [[ -n "${_SHELLCLAW_ZSH_LOADED:-}" ]]; then
     return 0
 fi
@@ -307,6 +350,15 @@ _ssc_init() {
         vi-backward-kill-word \
         vi-kill-line; do
         _ssc_wrap_edit_widget "$edit_widget"
+    done
+
+    local completion_widget
+    for completion_widget in \
+        expand-or-complete \
+        complete-word \
+        menu-complete \
+        reverse-menu-complete; do
+        _ssc_wrap_completion_widget "$completion_widget"
     done
 
     _ssc_open_socket || {
